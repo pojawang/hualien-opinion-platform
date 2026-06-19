@@ -1,21 +1,27 @@
 import StatusBadge from './StatusBadge.jsx';
-import { importanceLabel, platformLabel, sentimentLabel } from '../lib/labels.js';
+import {
+  cleanArticleText,
+  importanceLabel,
+  platformLabel,
+  publishedAtLabel,
+  sentimentLabel
+} from '../lib/labels.js';
 
 export default function ArticleCard({ article, onUpdate }) {
   return (
     <article className="articleCard">
       <div className="articleTop">
         <div>
-          <h3>{article.title || '未命名文章'}</h3>
+          <h3>{cleanArticleText(article.title, '未命名文章')}</h3>
           <p className="meta">
-            {article.source || '未知來源'} · {platformLabel(article.platform)} · {article.category || '其他'}
+            {cleanArticleText(article.source, '未知來源')} · {platformLabel(article.platform)} · {article.category || '其他'}
           </p>
         </div>
         <StatusBadge status={article.status} />
       </div>
-      <p className="snippet">{article.summary || article.snippet || '沒有摘要'}</p>
+      <p className="snippet">{cleanArticleText(article.summary || article.snippet, '沒有摘要')}</p>
       <div className="articleInfo">
-        <span>發布：{article.published_at || '未提供'}</span>
+        <span>發布：{publishedAtLabel(article.published_at)}</span>
         <span>重要程度：{importanceLabel(article.importance)}</span>
         <span>情緒：{sentimentLabel(article.sentiment)}</span>
       </div>
