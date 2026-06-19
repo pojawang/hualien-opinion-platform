@@ -3,6 +3,7 @@ import { BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContaine
 import ArticleCard from '../components/ArticleCard.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { apiFetch } from '../lib/supabase.js';
+import { localizeSentimentCounts } from '../lib/labels.js';
 
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
 
@@ -25,11 +26,13 @@ export default function Dashboard() {
   if (error) return <div className="alert">{error}</div>;
   if (!stats) return <div className="panel">載入中...</div>;
 
+  const sentimentCounts = localizeSentimentCounts(stats.sentimentCounts);
+
   return (
     <div className="pageStack">
       <header className="pageHeader">
         <div>
-          <h2>Dashboard</h2>
+          <h2>儀表板</h2>
           <p>今日輿情與審核狀態總覽</p>
         </div>
       </header>
@@ -57,8 +60,8 @@ export default function Dashboard() {
           <h3>情緒比例</h3>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={stats.sentimentCounts} dataKey="value" nameKey="name" outerRadius={90} label>
-                {stats.sentimentCounts.map((entry, index) => (
+              <Pie data={sentimentCounts} dataKey="value" nameKey="name" outerRadius={90} label>
+                {sentimentCounts.map((entry, index) => (
                   <Cell key={entry.name} fill={pieColors[index % pieColors.length]} />
                 ))}
               </Pie>
