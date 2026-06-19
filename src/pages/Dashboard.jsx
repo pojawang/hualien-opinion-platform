@@ -1,21 +1,42 @@
 import { useEffect, useState } from 'react';
-import { BarChart, Bar, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Cell
+} from 'recharts';
 import ArticleCard from '../components/ArticleCard.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { apiFetch } from '../lib/supabase.js';
-import { localizeSentimentCounts } from '../lib/labels.js';
+import { cleanArticleText, importanceLabel, localizeSentimentCounts } from '../lib/labels.js';
 
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
+  const [selectedKeyword, setSelectedKeyword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  async function load() {
+  async function load(keyword = selectedKeyword) {
     try {
-      setStats(await apiFetch('stats'));
+      setLoading(true);
+      setError('');
+      const query = keyword ? `?keyword=${encodeURIComponent(keyword)}` : '';
+      setStats(await apiFetch(`stats${query}`));
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -33,8 +54,23 @@ export default function Dashboard() {
       <header className="pageHeader">
         <div>
           <h2>儀表板</h2>
-          <p>今日輿情與審核狀態總覽</p>
+          <p>{selectedKeyword ? `「${selectedKeyword}」相關輿情總覽` : '今日輿情與審核狀態總覽'}</p>
         </div>
+        <label className="keywordPicker">
+          <span>關鍵字</span>
+          <select
+            value={selectedKeyword}
+            disabled={loading}
+            onChange={(event) => {
+              const keyword = event.target.value;
+              setSelectedKeyword(keyword);
+              load(keyword);
+            }}
+          >
+            <option value="">全部關鍵字</option>
+            {stats.keywords.map((keyword) => <option key={keyword} value={keyword}>{keyword}</option>)}
+          </select>
+        </label>
       </header>
       <section className="statsGrid">
         <StatCard label="今日新增" value={stats.todayCount} />
@@ -43,17 +79,26 @@ export default function Dashboard() {
         <StatCard label="已拒絕" value={stats.rejectedCount} />
         <StatCard label="已推播" value={stats.broadcastedCount} />
       </section>
+      <section className="panel summaryPanel">
+        <div className="sectionHeading">
+          <div>
+            <h3>AI 每日摘要</h3>
+            <span>{selectedKeyword || '全部關鍵字'}</span>
+          </div>
+        </div>
+        <p>{stats.dailySummary}</p>
+      </section>
       <section className="chartGrid">
         <div className="panel">
-          <h3>分類數量</h3>
+          <h3>聲量趨勢</h3>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={stats.categoryCounts}>
+            <LineChart data={stats.volumeTrend}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="value" fill="#0f766e" />
-            </BarChart>
+              <Tooltip formatter={(value) => [`${value} 則`, '聲量']} />
+              <Line type="monotone" dataKey="value" name="聲量" stroke="#0f766e" strokeWidth={3} activeDot={{ r: 6 }} />
+            </LineChart>
           </ResponsiveContainer>
         </div>
         <div className="panel">
@@ -71,13 +116,55 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>熱門關鍵字排行榜</h3>
+          <ol className="keywordRanking">
+            {stats.popularKeywords.map((item, index) => (
+              <li key={item.name}>
+                <strong>{index + 1}</strong>
+                <span>{item.name}</span>
+                <b>{item.value} 則</b>
+              </li>
+            ))}
+          </ol>
+          {stats.popularKeywords.length === 0 && <p className="emptyState">目前沒有關鍵字聲量。</p>}
+        </div>
+        <div className="panel warningPanel">
+          <div className="sectionHeading">
+            <h3>負評預警</h3>
+            <span>{stats.negativeAlerts.length} 則</span>
+          </div>
+          <div className="warningList">
+            {stats.negativeAlerts.map((article) => (
+              <a key={article.id} href={article.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(article.title, '未命名文章')}</span>
+                <small>{article.category || '其他'} · 重要程度：{importanceLabel(article.importance)}</small>
+              </a>
+            ))}
+          </div>
+          {stats.negativeAlerts.length === 0 && <p className="emptyState">目前沒有負面預警。</p>}
+        </div>
+      </section>
       <section className="panel">
-        <h3>最新 10 筆文章</h3>
+        <h3>分類數量</h3>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={stats.categoryCounts}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis allowDecimals={false} />
+            <Tooltip formatter={(value) => [`${value} 則`, '文章數']} />
+            <Bar dataKey="value" fill="#0f766e" />
+          </BarChart>
+        </ResponsiveContainer>
+      </section>
+      <section className="panel">
+        <h3>{selectedKeyword ? `「${selectedKeyword}」最新文章` : '最新 10 筆文章'}</h3>
         <div className="cardList">
           {stats.latestArticles.map((article) => (
             <ArticleCard key={article.id} article={article} onUpdate={async (id, payload) => {
               await apiFetch('articles', { method: 'PATCH', body: JSON.stringify({ id, ...payload }) });
-              load();
+              load(selectedKeyword);
             }} />
           ))}
         </div>
