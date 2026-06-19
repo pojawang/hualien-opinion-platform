@@ -123,6 +123,19 @@ a {
   margin: 6px 0 0;
 }
 
+.keywordPicker {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  min-width: min(280px, 100%);
+}
+
+.keywordPicker span {
+  color: #5e6d69;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .panel,
 .articleCard,
 .statCard,
@@ -164,6 +177,86 @@ a {
   display: grid;
   gap: 20px;
   grid-template-columns: 1.4fr 1fr;
+}
+
+.summaryPanel {
+  border-left: 4px solid #0f766e;
+}
+
+.summaryPanel p {
+  color: #384743;
+  line-height: 1.8;
+  margin: 10px 0 0;
+}
+
+.sectionHeading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.sectionHeading span {
+  background: #eef8f6;
+  border-radius: 999px;
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 9px;
+}
+
+.keywordRanking {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.keywordRanking li {
+  align-items: center;
+  border-bottom: 1px solid #e5eeeb;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 28px 1fr auto;
+  min-height: 42px;
+}
+
+.keywordRanking li:last-child {
+  border-bottom: 0;
+}
+
+.keywordRanking strong {
+  color: #0f766e;
+}
+
+.keywordRanking b {
+  color: #5e6d69;
+  font-size: 14px;
+}
+
+.warningPanel {
+  border-top: 3px solid #b91c1c;
+}
+
+.warningList {
+  display: grid;
+}
+
+.warningList a {
+  border-bottom: 1px solid #e5eeeb;
+  display: grid;
+  gap: 5px;
+  padding: 11px 0;
+}
+
+.warningList a:last-child {
+  border-bottom: 0;
+}
+
+.warningList small,
+.emptyState {
+  color: #5e6d69;
 }
 
 .cardList {
