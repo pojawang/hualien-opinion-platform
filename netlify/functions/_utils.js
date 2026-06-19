@@ -78,8 +78,26 @@ export function allowedMethod(event, methods) {
 }
 
 export function cleanText(value = '') {
-  return String(value)
+  const namedEntities = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"'
+  };
+
+  let text = String(value);
+  for (let index = 0; index < 2; index += 1) {
+    text = text
+      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([\da-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+      .replace(/&(amp|apos|gt|lt|nbsp|quot);/gi, (_, name) => namedEntities[name.toLowerCase()]);
+  }
+
+  return text
     .replace(/<[^>]+>/g, ' ')
+    .replace(/\u00a0/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
