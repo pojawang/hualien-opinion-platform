@@ -102,6 +102,22 @@ export function allowedMethod(event, methods) {
   return methods.includes(event.httpMethod);
 }
 
+export async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('外部來源連線逾時');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function cleanText(value = '') {
   const namedEntities = {
     amp: '&',
@@ -171,7 +187,7 @@ export function estimateImportance(category, title = '', snippet = '') {
 }
 
 export async function parseXmlFeed(url, sourceType = 'rss') {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': 'HualienOpinionPlatform/1.0'
     }
@@ -216,7 +232,7 @@ export async function parseXmlFeed(url, sourceType = 'rss') {
 }
 
 export async function fetchMeta(url) {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': 'HualienOpinionPlatform/1.0'
     }

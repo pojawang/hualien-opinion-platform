@@ -1,5 +1,6 @@
 import {
   fetchMeta,
+  fetchWithTimeout,
   guard,
   json,
   normalizeArticle,
@@ -11,7 +12,7 @@ import {
 async function serper(endpoint, query) {
   if (!process.env.SERPER_API_KEY) return [];
 
-  const response = await fetch(`https://google.serper.dev/${endpoint}`, {
+  const response = await fetchWithTimeout(`https://google.serper.dev/${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -50,7 +51,7 @@ async function youtube(query) {
     key: process.env.YOUTUBE_API_KEY
   });
 
-  const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
+  const response = await fetchWithTimeout(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`YouTube API 失敗：${response.status}`);
   }
@@ -88,13 +89,29 @@ function tagSource(items, source) {
   }));
 }
 
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workerCount = Math.min(limit, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 async function collectXmlSource(source) {
   const items = await parseXmlFeed(source.url, source.source_type);
-  const enrichedItems = [];
-
-  for (const item of items.slice(0, 25)) {
+  const selectedItems = items.slice(0, 25);
+  const enrichedItems = await mapWithConcurrency(selectedItems, 4, async (item, index) => {
     let enriched = item;
-    if (!item.snippet || item.title === item.url) {
+    if (index < 8 && (!item.snippet || item.title === item.url)) {
       const meta = await fetchMeta(item.url).catch(() => null);
       if (meta) {
         enriched = {
@@ -105,8 +122,8 @@ async function collectXmlSource(source) {
         };
       }
     }
-    enrichedItems.push(enriched);
-  }
+    return enriched;
+  });
 
   return tagSource(enrichedItems, source);
 }
@@ -157,7 +174,7 @@ async function collectFromSources(sources) {
   const results = [];
   const errors = [];
 
-  for (const source of sources) {
+  await mapWithConcurrency(sources, 4, async (source) => {
     try {
       if (['rss', 'sitemap'].includes(source.source_type)) {
         results.push(...await collectXmlSource(source));
@@ -169,15 +186,15 @@ async function collectFromSources(sources) {
     } catch (err) {
       errors.push({ source: source.name || source.url, message: err.message });
     }
-  }
+  });
 
   return { results, errors };
 }
 
 async function insertArticles(supabase, candidates) {
-  let inserted = 0;
   let duplicates = 0;
   const seen = new Set();
+  const articles = [];
 
   for (const candidate of candidates) {
     if (!candidate.url || seen.has(candidate.url)) {
@@ -186,20 +203,20 @@ async function insertArticles(supabase, candidates) {
     }
     seen.add(candidate.url);
 
-    const article = normalizeArticle(candidate);
-    const { error } = await supabase.from('articles').insert(article);
+    articles.push(normalizeArticle(candidate));
+  }
 
-    if (!error) {
-      inserted += 1;
-      continue;
-    }
-
-    if (error.code === '23505' || error.message?.includes('duplicate')) {
-      duplicates += 1;
-      continue;
-    }
-
-    throw error;
+  let inserted = 0;
+  for (let index = 0; index < articles.length; index += 100) {
+    const chunk = articles.slice(index, index + 100);
+    const { data, error } = await supabase
+      .from('articles')
+      .upsert(chunk, { onConflict: 'url', ignoreDuplicates: true })
+      .select('url');
+    if (error) throw error;
+    const insertedCount = data?.length || 0;
+    inserted += insertedCount;
+    duplicates += chunk.length - insertedCount;
   }
 
   return { inserted, duplicates };
@@ -233,29 +250,27 @@ export async function handler(event) {
 
     const candidates = [];
     const errors = [];
+    const tasks = [];
 
     for (const item of keywords || []) {
-      try {
-        candidates.push(...await serper('search', item.keyword));
-      } catch (err) {
-        errors.push({ source: `Serper Search ${item.keyword}`, message: err.message });
-      }
-
-      try {
-        candidates.push(...await serper('news', `${item.keyword} 新聞`));
-      } catch (err) {
-        errors.push({ source: `Serper News ${item.keyword}`, message: err.message });
-      }
+      tasks.push(
+        { source: `Serper Search ${item.keyword}`, run: () => serper('search', item.keyword) },
+        { source: `Serper News ${item.keyword}`, run: () => serper('news', `${item.keyword} 新聞`) }
+      );
     }
 
     const youtubeQueries = ['花蓮旅遊', '花蓮美食', '花蓮景點', '花蓮活動', '花蓮Vlog', '花蓮住宿'];
     for (const query of youtubeQueries) {
-      try {
-        candidates.push(...await youtube(query));
-      } catch (err) {
-        errors.push({ source: `YouTube ${query}`, message: err.message });
-      }
+      tasks.push({ source: `YouTube ${query}`, run: () => youtube(query) });
     }
+
+    await mapWithConcurrency(tasks, 6, async (task) => {
+      try {
+        candidates.push(...await task.run());
+      } catch (err) {
+        errors.push({ source: task.source, message: err.message });
+      }
+    });
 
     const sourceResults = await collectFromSources(sources || []);
     candidates.push(...sourceResults.results);

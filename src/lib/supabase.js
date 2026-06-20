@@ -35,7 +35,13 @@ export async function apiFetch(path, options = {}) {
     headers
   });
 
-  const data = await response.json().catch(() => ({}));
+  const rawBody = await response.text();
+  let data = {};
+  try {
+    data = rawBody ? JSON.parse(rawBody) : {};
+  } catch {
+    data = {};
+  }
   if (!response.ok) {
     if (response.status === 401 && path !== 'auth') {
       clearToken();
@@ -43,7 +49,11 @@ export async function apiFetch(path, options = {}) {
       window.location.replace('/login');
       throw new Error('登入已逾期，請重新登入。');
     }
-    throw new Error(data.error || '請求失敗');
+    const statusMessages = {
+      502: '後端服務暫時無法回應，請稍後再試。（502）',
+      504: '搜尋執行逾時，請稍後再試。（504）'
+    };
+    throw new Error(data.error || statusMessages[response.status] || `請求失敗（${response.status}）`);
   }
   return data;
 }
