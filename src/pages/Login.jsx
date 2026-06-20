@@ -7,6 +7,11 @@ export default function Login() {
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [notice] = useState(() => {
+    const message = sessionStorage.getItem('hualien_login_notice') || '';
+    sessionStorage.removeItem('hualien_login_notice');
+    return message;
+  });
 
   async function submit(event) {
     event.preventDefault();
@@ -32,6 +37,7 @@ export default function Login() {
       <form className="loginPanel" onSubmit={submit}>
         <h1>花蓮輿情平台</h1>
         <p>後台管理登入</p>
+        {notice && <div className="notice">{notice}</div>}
         {error && <div className="alert">{error}</div>}
         <label>
           帳號
