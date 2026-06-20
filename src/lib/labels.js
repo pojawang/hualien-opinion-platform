@@ -13,11 +13,36 @@ const sentimentLabels = {
 
 const platformLabels = {
   web: '網頁',
+  website: '一般網站',
   news: '新聞',
+  google_news: 'Google News',
+  google_search: 'Google 搜尋',
   youtube: 'YouTube',
   rss: 'RSS',
-  sitemap: '網站地圖'
+  sitemap: 'Sitemap',
+  facebook_page: 'Facebook 粉專',
+  facebook_group: 'Facebook 社團',
+  google_reviews: 'Google 評論',
+  ptt: 'PTT',
+  dcard: 'Dcard'
 };
+
+export const sourceTypeOptions = [
+  ['rss', 'RSS'],
+  ['sitemap', 'Sitemap'],
+  ['google_news', 'Google News'],
+  ['youtube', 'YouTube'],
+  ['facebook_page', 'Facebook 粉專'],
+  ['facebook_group', 'Facebook 社團'],
+  ['google_reviews', 'Google 評論'],
+  ['ptt', 'PTT'],
+  ['dcard', 'Dcard'],
+  ['website', '一般網站']
+];
+
+export function sourceTypeLabel(value = 'website') {
+  return platformLabels[value.toLowerCase?.()] || value;
+}
 
 export function importanceLabel(value = 'medium') {
   return importanceLabels[value] || value;

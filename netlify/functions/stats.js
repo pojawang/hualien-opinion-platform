@@ -128,6 +128,8 @@ export async function handler(event) {
       rejectedCount: articles.filter((item) => item.status === 'rejected').length,
       broadcastedCount: articles.filter((item) => item.is_broadcasted).length,
       categoryCounts: countBy(articles, 'category'),
+      sourceCounts: countBy(articles, 'platform', 'website')
+        .sort((a, b) => b.value - a.value),
       sentimentCounts: countBy(articles, 'sentiment', 'neutral'),
       volumeTrend: buildVolumeTrend(articles),
       popularKeywords,

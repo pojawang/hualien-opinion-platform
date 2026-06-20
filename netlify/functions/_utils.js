@@ -22,6 +22,27 @@ export const defaultKeywords = [
   ['洄瀾網', '其他']
 ];
 
+export const SOURCE_TYPES = Object.freeze([
+  'rss',
+  'sitemap',
+  'google_news',
+  'youtube',
+  'facebook_page',
+  'facebook_group',
+  'google_reviews',
+  'ptt',
+  'dcard',
+  'website'
+]);
+
+export function normalizeSourceType(value = 'rss') {
+  const sourceType = String(value).trim().toLowerCase();
+  if (!SOURCE_TYPES.includes(sourceType)) {
+    throw new Error('不支援的來源類型');
+  }
+  return sourceType;
+}
+
 export function json(statusCode, body) {
   return {
     statusCode,

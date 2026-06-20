@@ -17,7 +17,12 @@ import {
 import ArticleCard from '../components/ArticleCard.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { apiFetch } from '../lib/supabase.js';
-import { cleanArticleText, importanceLabel, localizeSentimentCounts } from '../lib/labels.js';
+import {
+  cleanArticleText,
+  importanceLabel,
+  localizeSentimentCounts,
+  sourceTypeLabel
+} from '../lib/labels.js';
 
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
 
@@ -48,6 +53,10 @@ export default function Dashboard() {
   if (!stats) return <div className="panel">載入中...</div>;
 
   const sentimentCounts = localizeSentimentCounts(stats.sentimentCounts);
+  const sourceCounts = (stats.sourceCounts || []).map((item) => ({
+    ...item,
+    name: sourceTypeLabel(item.name)
+  }));
 
   return (
     <div className="pageStack">
@@ -146,17 +155,31 @@ export default function Dashboard() {
           {stats.negativeAlerts.length === 0 && <p className="emptyState">目前沒有負面預警。</p>}
         </div>
       </section>
-      <section className="panel">
-        <h3>分類數量</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={stats.categoryCounts}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis allowDecimals={false} />
-            <Tooltip formatter={(value) => [`${value} 則`, '文章數']} />
-            <Bar dataKey="value" fill="#0f766e" />
-          </BarChart>
-        </ResponsiveContainer>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>分類數量</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={stats.categoryCounts}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis allowDecimals={false} />
+              <Tooltip formatter={(value) => [`${value} 則`, '文章數']} />
+              <Bar dataKey="value" fill="#0f766e" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="panel">
+          <h3>來源統計</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={sourceCounts} layout="vertical" margin={{ left: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="name" width={105} />
+              <Tooltip formatter={(value) => [`${value} 則`, '文章數']} />
+              <Bar dataKey="value" fill="#d97706" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </section>
       <section className="panel">
         <h3>{selectedKeyword ? `「${selectedKeyword}」最新文章` : '最新 10 筆文章'}</h3>

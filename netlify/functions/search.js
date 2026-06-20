@@ -68,31 +68,103 @@ async function youtube(query) {
   })).filter((item) => item.url && !item.url.endsWith('undefined'));
 }
 
+function sourceDomain(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function sourceQuery(source, prefix = '') {
+  return [prefix, '花蓮', source.name].filter(Boolean).join(' ');
+}
+
+function tagSource(items, source) {
+  return items.map((item) => ({
+    ...item,
+    source: source.name,
+    platform: source.source_type
+  }));
+}
+
+async function collectXmlSource(source) {
+  const items = await parseXmlFeed(source.url, source.source_type);
+  const enrichedItems = [];
+
+  for (const item of items.slice(0, 25)) {
+    let enriched = item;
+    if (!item.snippet || item.title === item.url) {
+      const meta = await fetchMeta(item.url).catch(() => null);
+      if (meta) {
+        enriched = {
+          ...item,
+          title: meta.title || item.title,
+          snippet: meta.description || item.snippet,
+          summary: meta.description || item.summary
+        };
+      }
+    }
+    enrichedItems.push(enriched);
+  }
+
+  return tagSource(enrichedItems, source);
+}
+
+async function collectWebsiteSource(source) {
+  const results = [];
+  const domain = sourceDomain(source.url);
+  if (domain) {
+    results.push(...await serper('search', `site:${domain} 花蓮`));
+  }
+
+  const meta = await fetchMeta(source.url).catch(() => null);
+  if (meta?.title) {
+    results.push({
+      title: meta.title,
+      url: source.url,
+      snippet: meta.description,
+      summary: meta.description,
+      published_at: ''
+    });
+  }
+
+  return tagSource(results, source);
+}
+
+async function collectApiSource(source) {
+  switch (source.source_type) {
+    case 'google_news':
+      return tagSource(await serper('news', sourceQuery(source)), source);
+    case 'youtube':
+      return tagSource(await youtube(sourceQuery(source)), source);
+    case 'facebook_page':
+      return tagSource(await serper('search', sourceQuery(source, 'site:facebook.com')), source);
+    case 'facebook_group':
+      return tagSource(await serper('search', sourceQuery(source, 'site:facebook.com/groups')), source);
+    case 'google_reviews':
+      return tagSource(await serper('search', `${sourceQuery(source)} Google 評論`), source);
+    case 'ptt':
+      return tagSource(await serper('search', sourceQuery(source, 'site:ptt.cc')), source);
+    case 'dcard':
+      return tagSource(await serper('search', sourceQuery(source, 'site:dcard.tw')), source);
+    default:
+      throw new Error(`不支援的來源類型：${source.source_type}`);
+  }
+}
+
 async function collectFromSources(sources) {
   const results = [];
   const errors = [];
 
   for (const source of sources) {
     try {
-      const items = await parseXmlFeed(source.url, source.source_type);
-      for (const item of items.slice(0, 25)) {
-        let enriched = item;
-        if (!item.snippet || item.title === item.url) {
-          const meta = await fetchMeta(item.url).catch(() => null);
-          if (meta) {
-            enriched = {
-              ...item,
-              title: meta.title || item.title,
-              snippet: meta.description || item.snippet,
-              summary: meta.description || item.summary
-            };
-          }
-        }
-        results.push({
-          ...enriched,
-          source: source.name,
-          platform: source.platform || source.source_type
-        });
+      if (['rss', 'sitemap'].includes(source.source_type)) {
+        results.push(...await collectXmlSource(source));
+      } else if (source.source_type === 'website') {
+        results.push(...await collectWebsiteSource(source));
+      } else {
+        results.push(...await collectApiSource(source));
       }
     } catch (err) {
       errors.push({ source: source.name || source.url, message: err.message });

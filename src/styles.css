@@ -376,7 +376,7 @@ a {
 .formGrid {
   display: grid;
   gap: 12px;
-  grid-template-columns: 1fr 140px 2fr 1fr auto;
+  grid-template-columns: 1fr 190px 2fr auto;
 }
 
 .tablePanel {
