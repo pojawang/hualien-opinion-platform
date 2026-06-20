@@ -49,8 +49,18 @@ async function testSource(body) {
     return { status: 400, body: { error: 'YOUTUBE_API_KEY 尚未設定' } };
   }
 
+  if (sourceType === 'facebook_page' && process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+    return {
+      status: 200,
+      body: { ok: true, count: 0, sample: [], message: 'Facebook Graph API 設定完成' }
+    };
+  }
+
   if (sourceType !== 'youtube' && !process.env.SERPER_API_KEY) {
-    return { status: 400, body: { error: 'SERPER_API_KEY 尚未設定' } };
+    const message = sourceType === 'facebook_page'
+      ? 'FACEBOOK_PAGE_ACCESS_TOKEN 或 SERPER_API_KEY 尚未設定'
+      : 'SERPER_API_KEY 尚未設定';
+    return { status: 400, body: { error: message } };
   }
 
   return {

@@ -46,6 +46,8 @@ create table if not exists articles (
   category text,
   snippet text,
   summary text,
+  post_id text,
+  image_url text,
   published_at text,
   sentiment text check (sentiment in ('positive', 'neutral', 'negative')),
   importance text check (importance in ('low', 'medium', 'high', 'urgent')),
@@ -65,6 +67,7 @@ create index if not exists idx_articles_status on articles(status);
 create index if not exists idx_articles_category on articles(category);
 create index if not exists idx_articles_created_at on articles(created_at desc);
 create index if not exists idx_articles_is_broadcasted on articles(is_broadcasted);
+create index if not exists idx_articles_post_id on articles(post_id) where post_id is not null;
 
 insert into keywords (keyword, category, enabled) values
   ('花蓮', '其他', true),

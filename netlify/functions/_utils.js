@@ -266,6 +266,8 @@ export function normalizeArticle(item) {
     category,
     snippet,
     summary: cleanText(item.summary || snippet),
+    post_id: item.post_id || null,
+    image_url: item.image_url || null,
     published_at: item.published_at || '',
     sentiment,
     importance: item.importance || estimateImportance(category, title, snippet),

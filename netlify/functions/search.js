@@ -69,6 +69,84 @@ async function youtube(query) {
   })).filter((item) => item.url && !item.url.endsWith('undefined'));
 }
 
+function facebookPageIdentifier(url) {
+  try {
+    const parsed = new URL(url);
+    const queryId = parsed.searchParams.get('id');
+    if (queryId) return queryId;
+
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    const numericId = [...segments].reverse().find((segment) => /^\d+$/.test(segment));
+    if (numericId) return numericId;
+    return segments[0] || '';
+  } catch {
+    return '';
+  }
+}
+
+async function facebookGraph(path, params = {}) {
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  if (!token) throw new Error('FACEBOOK_PAGE_ACCESS_TOKEN 尚未設定');
+
+  const configuredVersion = process.env.FACEBOOK_GRAPH_API_VERSION || 'v23.0';
+  const version = /^v\d+\.\d+$/.test(configuredVersion) ? configuredVersion : 'v23.0';
+  const query = new URLSearchParams(params);
+  const response = await fetchWithTimeout(
+    `https://graph.facebook.com/${version}/${path}?${query.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error) {
+    throw new Error(data.error?.message || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+function facebookPostImage(post) {
+  const attachment = post.attachments?.data?.[0];
+  const subattachment = attachment?.subattachments?.data?.find((item) => item.media?.image?.src);
+  return post.full_picture || attachment?.media?.image?.src || subattachment?.media?.image?.src || '';
+}
+
+async function facebookPagePosts(source) {
+  const identifier = facebookPageIdentifier(source.url);
+  if (!identifier) throw new Error('無法從粉專 URL 辨識 Facebook Page ID');
+
+  const page = await facebookGraph(encodeURIComponent(identifier), { fields: 'id,name' });
+  const posts = await facebookGraph(`${encodeURIComponent(page.id)}/posts`, {
+    fields: 'id,message,created_time,permalink_url,full_picture,attachments{media,subattachments{media}}',
+    limit: '10'
+  });
+
+  return (posts.data || []).map((post) => {
+    const message = post.message?.trim() || '';
+    return {
+      title: message ? message.slice(0, 90) : `${page.name || source.name} Facebook 貼文`,
+      url: post.permalink_url || `https://www.facebook.com/${post.id}`,
+      snippet: message,
+      summary: message,
+      published_at: post.created_time || '',
+      post_id: post.id,
+      image_url: facebookPostImage(post)
+    };
+  }).filter((post) => post.url);
+}
+
+async function collectFacebookPageSource(source) {
+  if (process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+    try {
+      const posts = await facebookPagePosts(source);
+      if (posts.length > 0) return tagSource(posts, source);
+    } catch (err) {
+      const fallback = await serper('search', sourceQuery(source, 'site:facebook.com'));
+      if (fallback.length > 0) return tagSource(fallback, source);
+      throw new Error(`Facebook Graph API 失敗：${err.message}`);
+    }
+  }
+
+  return tagSource(await serper('search', sourceQuery(source, 'site:facebook.com')), source);
+}
+
 function sourceDomain(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
@@ -156,7 +234,7 @@ async function collectApiSource(source) {
     case 'youtube':
       return tagSource(await youtube(sourceQuery(source)), source);
     case 'facebook_page':
-      return tagSource(await serper('search', sourceQuery(source, 'site:facebook.com')), source);
+      return collectFacebookPageSource(source);
     case 'facebook_group':
       return tagSource(await serper('search', sourceQuery(source, 'site:facebook.com/groups')), source);
     case 'google_reviews':

@@ -127,6 +127,7 @@ export async function handler(event) {
       approvedCount: articles.filter((item) => item.status === 'approved').length,
       rejectedCount: articles.filter((item) => item.status === 'rejected').length,
       broadcastedCount: articles.filter((item) => item.is_broadcasted).length,
+      facebookPostCount: articles.filter((item) => item.platform === 'facebook_page' && item.post_id).length,
       categoryCounts: countBy(articles, 'category'),
       sourceCounts: countBy(articles, 'platform', 'website')
         .sort((a, b) => b.value - a.value),

@@ -87,6 +87,7 @@ export default function Dashboard() {
         <StatCard label="已核准" value={stats.approvedCount} />
         <StatCard label="已拒絕" value={stats.rejectedCount} />
         <StatCard label="已推播" value={stats.broadcastedCount} />
+        <StatCard label="Facebook 貼文" value={stats.facebookPostCount || 0} />
       </section>
       <section className="panel summaryPanel">
         <div className="sectionHeading">
