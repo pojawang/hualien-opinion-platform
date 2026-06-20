@@ -37,6 +37,12 @@ export async function apiFetch(path, options = {}) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && path !== 'auth') {
+      clearToken();
+      sessionStorage.setItem('hualien_login_notice', '登入已逾期，請重新登入。');
+      window.location.replace('/login');
+      throw new Error('登入已逾期，請重新登入。');
+    }
     throw new Error(data.error || '請求失敗');
   }
   return data;
