@@ -63,7 +63,11 @@ export function verifyRequest(event) {
   if (!token) {
     throw new Error('尚未登入');
   }
-  return jwt.verify(token, process.env.JWT_SECRET);
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    throw new Error('尚未登入');
+  }
 }
 
 export function guard(event) {
