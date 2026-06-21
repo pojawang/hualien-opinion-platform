@@ -110,10 +110,10 @@ async function fetchSerperPosts(
         'X-API-KEY': apiKey
       },
       body: JSON.stringify({
-        q: 'site:dcard.tw/f (花蓮 OR 太魯閣 OR 七星潭 OR 東大門夜市)',
+        q: 'site:dcard.tw/f 花蓮',
         gl: 'tw',
         hl: 'zh-tw',
-        num: 20
+        num: 10
       })
     });
     if (!response.ok) throw new Error(`Serper HTTP ${response.status}`);

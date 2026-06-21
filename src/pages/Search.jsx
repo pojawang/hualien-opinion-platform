@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { apiFetch } from '../lib/supabase.js';
 
+function collectorErrorMessage(message) {
+  if (String(message).includes("Could not find the table 'public.posts'")) {
+    return '尚未建立 posts 資料表，請先在 Supabase 執行 posts migration。';
+  }
+  return message;
+}
+
 export default function Search() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -23,10 +30,10 @@ export default function Search() {
       if (dcardResult.status === 'rejected') collectorErrors.push(`Dcard：${dcardResult.reason.message}`);
       if (pttResult.status === 'rejected') collectorErrors.push(`PTT：${pttResult.reason.message}`);
       if (dcardResult.status === 'fulfilled') {
-        collectorErrors.push(...(dcardResult.value.errors || []).map((item) => `Dcard ${item.forum}：${item.message}`));
+        collectorErrors.push(...(dcardResult.value.errors || []).map((item) => `Dcard ${item.forum}：${collectorErrorMessage(item.message)}`));
       }
       if (pttResult.status === 'fulfilled') {
-        collectorErrors.push(...(pttResult.value.errors || []).map((item) => `PTT ${item.board}：${item.message}`));
+        collectorErrors.push(...(pttResult.value.errors || []).map((item) => `PTT ${item.board}：${collectorErrorMessage(item.message)}`));
       }
       setResult({
         ...searchResult.value,
