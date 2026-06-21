@@ -59,6 +59,13 @@ async function testSource(body) {
     };
   }
 
+  if (sourceType === 'ptt') {
+    return {
+      status: 200,
+      body: { ok: true, count: 0, sample: [], message: 'PTT 公開看板蒐集已啟用' }
+    };
+  }
+
   if (!process.env.SERPER_API_KEY) {
     const message = sourceType === 'facebook_page'
       ? 'FACEBOOK_PAGE_ACCESS_TOKEN 或 SERPER_API_KEY 尚未設定'

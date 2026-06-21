@@ -69,6 +69,27 @@ create table if not exists broadcasts (
   line_message_id text
 );
 
+create table if not exists posts (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  content text,
+  url text unique not null,
+  source text not null default 'dcard',
+  source_name text,
+  external_id text unique not null,
+  author text,
+  push_count integer default 0,
+  published_at timestamptz,
+  like_count integer default 0,
+  comment_count integer default 0,
+  share_count integer default 0,
+  sentiment text default 'neutral' check (sentiment in ('positive', 'neutral', 'negative')),
+  status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  raw_data jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 create index if not exists idx_articles_status on articles(status);
 create index if not exists idx_articles_category on articles(category);
 create index if not exists idx_articles_created_at on articles(created_at desc);
@@ -77,6 +98,10 @@ create index if not exists idx_articles_post_id on articles(post_id) where post_
 create index if not exists idx_articles_channel_name on articles(channel_name) where channel_name is not null;
 create index if not exists idx_articles_view_count on articles(view_count desc) where platform = 'youtube';
 create index if not exists idx_articles_dcard_engagement on articles((like_count + comment_count) desc) where platform = 'dcard';
+create index if not exists idx_posts_source on posts(source);
+create index if not exists idx_posts_published_at on posts(published_at desc);
+create index if not exists idx_posts_engagement on posts((like_count + comment_count) desc) where source = 'dcard';
+create index if not exists idx_posts_ptt_push_count on posts(push_count desc) where source = 'ptt';
 
 insert into keywords (keyword, category, enabled) values
   ('花蓮', '其他', true),

@@ -91,6 +91,7 @@ export default function Dashboard() {
         <StatCard label="Facebook 貼文" value={stats.facebookPostCount || 0} />
         <StatCard label="YouTube 影片" value={stats.youtubeVideoCount || 0} />
         <StatCard label="Dcard 聲量" value={stats.dcardCount || 0} />
+        <StatCard label="PTT 聲量" value={stats.pttCount || 0} />
       </section>
       <section className="panel summaryPanel">
         <div className="sectionHeading">
@@ -155,6 +156,46 @@ export default function Dashboard() {
           </ol>
           {stats.dcardDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 Dcard 關鍵字資料。</p>}
         </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>PTT 熱門文章</h3>
+          <div className="warningList">
+            {(stats.pttTopPosts || []).map((post) => (
+              <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(post.title, '未命名文章')}</span>
+                <small>{post.author || '未知作者'} · {post.source_name || 'PTT'} · {numberFormat.format(Number(post.push_count) || 0)} 推</small>
+              </a>
+            ))}
+          </div>
+          {stats.pttTopPosts?.length === 0 && <p className="emptyState">目前沒有 PTT 文章資料。</p>}
+        </div>
+        <div className="panel">
+          <h3>PTT 熱門關鍵字</h3>
+          <ol className="keywordRanking">
+            {(stats.pttDiscussionKeywords || []).map((item, index) => (
+              <li key={item.name}>
+                <strong>{index + 1}</strong>
+                <span>{item.name}</span>
+                <b>{item.value} 則</b>
+              </li>
+            ))}
+          </ol>
+          {stats.pttDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 PTT 關鍵字資料。</p>}
+        </div>
+      </section>
+      <section className="panel">
+        <h3>PTT 推文排行</h3>
+        <ol className="keywordRanking">
+          {(stats.pttPushRanking || []).map((post, index) => (
+            <li key={post.id}>
+              <strong>{index + 1}</strong>
+              <a href={post.url} target="_blank" rel="noreferrer">{cleanArticleText(post.title, '未命名文章')}</a>
+              <b>{numberFormat.format(Number(post.push_count) || 0)} 推</b>
+            </li>
+          ))}
+        </ol>
+        {stats.pttPushRanking?.length === 0 && <p className="emptyState">目前沒有 PTT 推文資料。</p>}
       </section>
       <section className="chartGrid">
         <div className="panel">

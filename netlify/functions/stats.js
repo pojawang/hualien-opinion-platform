@@ -19,7 +19,7 @@ function dateKey(value = new Date()) {
 }
 
 function articleText(article) {
-  return `${article.title || ''} ${article.snippet || ''} ${article.summary || ''} ${article.source || ''}`.toLowerCase();
+  return `${article.title || ''} ${article.content || ''} ${article.snippet || ''} ${article.summary || ''} ${article.source || ''}`.toLowerCase();
 }
 
 function matchesKeyword(article, keyword) {
@@ -91,8 +91,7 @@ function buildYouTubeStats(articles) {
   };
 }
 
-function buildDcardStats(articles, keywords) {
-  const posts = articles.filter((item) => item.platform === 'dcard');
+function buildDcardStats(posts, keywords) {
   const discussionKeywords = keywords
     .map((keyword) => ({
       name: keyword,
@@ -116,6 +115,28 @@ function buildDcardStats(articles, keywords) {
   };
 }
 
+function buildPttStats(posts, keywords) {
+  const sortedByPush = posts
+    .slice()
+    .sort((a, b) => (Number(b.push_count) || 0) - (Number(a.push_count) || 0))
+    .slice(0, 10);
+  const discussionKeywords = keywords
+    .map((keyword) => ({
+      name: keyword,
+      value: posts.filter((post) => matchesKeyword(post, keyword)).length
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'zh-Hant'))
+    .slice(0, 10);
+
+  return {
+    count: posts.length,
+    topPosts: sortedByPush,
+    pushRanking: sortedByPush,
+    discussionKeywords
+  };
+}
+
 export async function handler(event) {
   try {
     guard(event);
@@ -124,18 +145,24 @@ export async function handler(event) {
     const selectedKeyword = (params.keyword || '').trim();
     const today = dateKey();
 
-    const [articleResult, keywordResult] = await Promise.all([
+    const [articleResult, keywordResult, postResult] = await Promise.all([
       supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(500),
-      supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword')
+      supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword'),
+      supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000)
     ]);
     if (articleResult.error) throw articleResult.error;
     if (keywordResult.error) throw keywordResult.error;
+    if (postResult.error && !['42P01', 'PGRST205'].includes(postResult.error.code)) throw postResult.error;
 
     const keywords = (keywordResult.data || []).map((item) => item.keyword);
     const allArticles = articleResult.data || [];
     const articles = selectedKeyword
       ? allArticles.filter((item) => matchesKeyword(item, selectedKeyword))
       : allArticles;
+    const socialPosts = postResult.error ? [] : postResult.data || [];
+    const filteredSocialPosts = selectedKeyword
+      ? socialPosts.filter((item) => matchesKeyword(item, selectedKeyword))
+      : socialPosts;
     const todayArticles = articles.filter((item) => dateKey(item.created_at) === today);
 
     if (params.report === 'daily') {
@@ -168,7 +195,8 @@ export async function handler(event) {
       .sort((a, b) => (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9))
       .slice(0, 5);
     const youtubeStats = buildYouTubeStats(articles);
-    const dcardStats = buildDcardStats(articles, keywords);
+    const dcardStats = buildDcardStats(filteredSocialPosts.filter((item) => item.source === 'dcard'), keywords);
+    const pttStats = buildPttStats(filteredSocialPosts.filter((item) => item.source === 'ptt'), keywords);
 
     return json(200, {
       keywords,
@@ -185,6 +213,10 @@ export async function handler(event) {
       dcardCount: dcardStats.count,
       dcardTopPosts: dcardStats.topPosts,
       dcardDiscussionKeywords: dcardStats.discussionKeywords,
+      pttCount: pttStats.count,
+      pttTopPosts: pttStats.topPosts,
+      pttDiscussionKeywords: pttStats.discussionKeywords,
+      pttPushRanking: pttStats.pushRanking,
       categoryCounts: countBy(articles, 'category'),
       sourceCounts: countBy(articles, 'platform', 'website')
         .sort((a, b) => b.value - a.value),
