@@ -67,6 +67,30 @@ function buildDailySummary(todayArticles, keyword, popularKeywords) {
   return `今日共蒐集 ${todayArticles.length} 則${subject}相關文章，主要集中於「${topCategory?.name || '其他'}」分類。${focusText}${warning}`;
 }
 
+function buildYouTubeStats(articles) {
+  const videos = articles.filter((item) => item.platform === 'youtube');
+  const channelMap = new Map();
+
+  for (const video of videos) {
+    const name = video.channel_name || '未知頻道';
+    const current = channelMap.get(name) || { name, value: 0, viewCount: 0 };
+    current.value += 1;
+    current.viewCount += Number(video.view_count) || 0;
+    channelMap.set(name, current);
+  }
+
+  return {
+    count: videos.length,
+    channels: Array.from(channelMap.values())
+      .sort((a, b) => b.value - a.value || b.viewCount - a.viewCount)
+      .slice(0, 10),
+    topVideos: videos
+      .slice()
+      .sort((a, b) => (Number(b.view_count) || 0) - (Number(a.view_count) || 0))
+      .slice(0, 10)
+  };
+}
+
 export async function handler(event) {
   try {
     guard(event);
@@ -118,6 +142,7 @@ export async function handler(event) {
       .filter((item) => item.sentiment === 'negative')
       .sort((a, b) => (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9))
       .slice(0, 5);
+    const youtubeStats = buildYouTubeStats(articles);
 
     return json(200, {
       keywords,
@@ -128,6 +153,9 @@ export async function handler(event) {
       rejectedCount: articles.filter((item) => item.status === 'rejected').length,
       broadcastedCount: articles.filter((item) => item.is_broadcasted).length,
       facebookPostCount: articles.filter((item) => item.platform === 'facebook_page' && item.post_id).length,
+      youtubeVideoCount: youtubeStats.count,
+      youtubeTopChannels: youtubeStats.channels,
+      youtubeTopVideos: youtubeStats.topVideos,
       categoryCounts: countBy(articles, 'category'),
       sourceCounts: countBy(articles, 'platform', 'website')
         .sort((a, b) => b.value - a.value),

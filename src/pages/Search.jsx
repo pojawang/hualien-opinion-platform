@@ -25,7 +25,7 @@ export default function Search() {
       <header className="pageHeader">
         <div>
           <h2>搜尋蒐集</h2>
-          <p>手動執行 Serper、YouTube、RSS 與 Sitemap 蒐集</p>
+          <p>手動執行 Serper Search、News、Videos、RSS 與 Sitemap 蒐集</p>
         </div>
         <button onClick={runSearch} disabled={loading}>{loading ? '蒐集中...' : '開始搜尋'}</button>
       </header>

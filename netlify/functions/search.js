@@ -26,7 +26,31 @@ async function serper(endpoint, query) {
   }
 
   const data = await response.json();
-  const items = endpoint === 'news' ? data.news || [] : data.organic || [];
+  const items = endpoint === 'news'
+    ? data.news || []
+    : endpoint === 'videos'
+      ? data.videos || []
+      : data.organic || [];
+
+  if (endpoint === 'videos') {
+    return items.map((item) => ({
+      title: item.title,
+      url: item.link,
+      source: 'YouTube',
+      platform: 'youtube',
+      category: '觀光',
+      sentiment: 'neutral',
+      snippet: item.snippet || item.description || '',
+      summary: item.snippet || item.description || '',
+      published_at: item.date || item.publishedAt || '',
+      channel_name: typeof item.channel === 'string'
+        ? item.channel
+        : item.channel?.name || item.source || '未知頻道',
+      view_count: parseViewCount(item.views ?? item.viewCount ?? item.snippet),
+      thumbnail: item.imageUrl || item.thumbnail || item.image || ''
+    })).filter((item) => isYouTubeUrl(item.url));
+  }
+
   return items.map((item) => ({
     title: item.title,
     url: item.link,
@@ -38,35 +62,26 @@ async function serper(endpoint, query) {
   })).filter((item) => item.url);
 }
 
-async function youtube(query) {
-  if (!process.env.YOUTUBE_API_KEY) return [];
-
-  const params = new URLSearchParams({
-    part: 'snippet',
-    q: query,
-    type: 'video',
-    maxResults: '10',
-    regionCode: 'TW',
-    relevanceLanguage: 'zh-Hant',
-    key: process.env.YOUTUBE_API_KEY
-  });
-
-  const response = await fetchWithTimeout(`https://www.googleapis.com/youtube/v3/search?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(`YouTube API 失敗：${response.status}`);
+function parseViewCount(value) {
+  if (typeof value === 'number') return Math.max(0, Math.trunc(value));
+  const text = String(value || '').replace(/,/g, '').toLowerCase();
+  if (!/(views?|觀看|次觀看)/i.test(text) && !/^\s*\d+(?:\.\d+)?\s*(k|m|b|萬|億)\s*$/i.test(text)) {
+    return 0;
   }
+  const match = text.match(/(\d+(?:\.\d+)?)\s*(k|m|b|萬|億)?(?:\s*(?:views?|次觀看|觀看))?/i);
+  if (!match) return 0;
 
-  const data = await response.json();
-  return (data.items || []).map((item) => ({
-    title: item.snippet?.title,
-    url: `https://www.youtube.com/watch?v=${item.id?.videoId}`,
-    source: item.snippet?.channelTitle || 'YouTube',
-    platform: 'youtube',
-    snippet: item.snippet?.description || '',
-    summary: item.snippet?.description || '',
-    published_at: item.snippet?.publishedAt || '',
-    thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || ''
-  })).filter((item) => item.url && !item.url.endsWith('undefined'));
+  const multipliers = { k: 1e3, m: 1e6, b: 1e9, '萬': 1e4, '億': 1e8 };
+  return Math.max(0, Math.trunc(Number(match[1]) * (multipliers[match[2]] || 1)));
+}
+
+function isYouTubeUrl(value) {
+  try {
+    const hostname = new URL(value).hostname.replace(/^www\./, '');
+    return hostname === 'youtube.com' || hostname === 'm.youtube.com' || hostname === 'youtu.be';
+  } catch {
+    return false;
+  }
 }
 
 function facebookPageIdentifier(url) {
@@ -232,7 +247,7 @@ async function collectApiSource(source) {
     case 'google_news':
       return tagSource(await serper('news', sourceQuery(source)), source);
     case 'youtube':
-      return tagSource(await youtube(sourceQuery(source)), source);
+      return serper('videos', sourceQuery(source));
     case 'facebook_page':
       return collectFacebookPageSource(source);
     case 'facebook_group':
@@ -333,13 +348,9 @@ export async function handler(event) {
     for (const item of keywords || []) {
       tasks.push(
         { source: `Serper Search ${item.keyword}`, run: () => serper('search', item.keyword) },
-        { source: `Serper News ${item.keyword}`, run: () => serper('news', `${item.keyword} 新聞`) }
+        { source: `Serper News ${item.keyword}`, run: () => serper('news', `${item.keyword} 新聞`) },
+        { source: `Serper Videos ${item.keyword}`, run: () => serper('videos', item.keyword) }
       );
-    }
-
-    const youtubeQueries = ['花蓮旅遊', '花蓮美食', '花蓮景點', '花蓮活動', '花蓮Vlog', '花蓮住宿'];
-    for (const query of youtubeQueries) {
-      tasks.push({ source: `YouTube ${query}`, run: () => youtube(query) });
     }
 
     await mapWithConcurrency(tasks, 6, async (task) => {

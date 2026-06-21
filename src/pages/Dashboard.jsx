@@ -25,6 +25,7 @@ import {
 } from '../lib/labels.js';
 
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
+const numberFormat = new Intl.NumberFormat('zh-TW');
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -88,6 +89,7 @@ export default function Dashboard() {
         <StatCard label="已拒絕" value={stats.rejectedCount} />
         <StatCard label="已推播" value={stats.broadcastedCount} />
         <StatCard label="Facebook 貼文" value={stats.facebookPostCount || 0} />
+        <StatCard label="YouTube 影片" value={stats.youtubeVideoCount || 0} />
       </section>
       <section className="panel summaryPanel">
         <div className="sectionHeading">
@@ -124,6 +126,33 @@ export default function Dashboard() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>YouTube 熱門頻道排行</h3>
+          <ol className="keywordRanking">
+            {(stats.youtubeTopChannels || []).map((channel, index) => (
+              <li key={channel.name}>
+                <strong>{index + 1}</strong>
+                <span>{channel.name}</span>
+                <b>{channel.value} 部</b>
+              </li>
+            ))}
+          </ol>
+          {stats.youtubeTopChannels?.length === 0 && <p className="emptyState">目前沒有 YouTube 頻道資料。</p>}
+        </div>
+        <div className="panel">
+          <h3>YouTube 觀看數前 10 名</h3>
+          <div className="warningList">
+            {(stats.youtubeTopVideos || []).map((video) => (
+              <a key={video.id} href={video.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(video.title, '未命名影片')}</span>
+                <small>{video.channel_name || '未知頻道'} · {numberFormat.format(Number(video.view_count) || 0)} 次觀看</small>
+              </a>
+            ))}
+          </div>
+          {stats.youtubeTopVideos?.length === 0 && <p className="emptyState">目前沒有 YouTube 觀看數資料。</p>}
         </div>
       </section>
       <section className="chartGrid">

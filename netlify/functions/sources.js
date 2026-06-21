@@ -45,10 +45,6 @@ async function testSource(body) {
     };
   }
 
-  if (sourceType === 'youtube' && !process.env.YOUTUBE_API_KEY) {
-    return { status: 400, body: { error: 'YOUTUBE_API_KEY 尚未設定' } };
-  }
-
   if (sourceType === 'facebook_page' && process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
     return {
       status: 200,
@@ -56,7 +52,7 @@ async function testSource(body) {
     };
   }
 
-  if (sourceType !== 'youtube' && !process.env.SERPER_API_KEY) {
+  if (!process.env.SERPER_API_KEY) {
     const message = sourceType === 'facebook_page'
       ? 'FACEBOOK_PAGE_ACCESS_TOKEN 或 SERPER_API_KEY 尚未設定'
       : 'SERPER_API_KEY 尚未設定';
@@ -69,7 +65,7 @@ async function testSource(body) {
       ok: true,
       count: 0,
       sample: [],
-      message: sourceType === 'youtube' ? 'YouTube API 設定完成' : 'Serper 公開搜尋設定完成'
+      message: sourceType === 'youtube' ? 'Serper Videos 設定完成' : 'Serper 公開搜尋設定完成'
     }
   };
 }
