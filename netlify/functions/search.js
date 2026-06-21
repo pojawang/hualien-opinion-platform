@@ -334,19 +334,19 @@ async function insertArticles(supabase, candidates) {
     if (lookupError) throw lookupError;
 
     const existingMap = new Map((existingRows || []).map((row) => [row.url, row]));
-    const rowsToWrite = [];
+    const rowsToInsert = [];
+    const rowsToUpdate = [];
 
     for (const article of chunk) {
       const existing = existingMap.get(article.url);
       if (!existing) {
-        rowsToWrite.push(article);
-        inserted += 1;
+        rowsToInsert.push(article);
         continue;
       }
 
       duplicates += 1;
       if (article.platform === 'youtube') {
-        rowsToWrite.push({
+        rowsToUpdate.push({
           ...existing,
           title: article.title || existing.title,
           source: 'YouTube',
@@ -363,10 +363,21 @@ async function insertArticles(supabase, candidates) {
       }
     }
 
-    if (rowsToWrite.length > 0) {
+    if (rowsToInsert.length > 0) {
+      const { data, error } = await supabase
+        .from('articles')
+        .upsert(rowsToInsert, { onConflict: 'url', ignoreDuplicates: true })
+        .select('url');
+      if (error) throw error;
+      const insertedCount = data?.length || 0;
+      inserted += insertedCount;
+      duplicates += rowsToInsert.length - insertedCount;
+    }
+
+    if (rowsToUpdate.length > 0) {
       const { error } = await supabase
         .from('articles')
-        .upsert(rowsToWrite, { onConflict: 'url' });
+        .upsert(rowsToUpdate, { onConflict: 'url' });
       if (error) throw error;
     }
   }
