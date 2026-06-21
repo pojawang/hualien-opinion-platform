@@ -84,6 +84,23 @@ function isYouTubeUrl(value) {
   }
 }
 
+async function youtubeVideos(query) {
+  const videos = await serper('videos', query);
+  if (videos.length > 0) return videos;
+
+  const fallback = await serper('search', `site:youtube.com/watch ${query}`);
+  return fallback.filter((item) => isYouTubeUrl(item.url)).map((item) => ({
+    ...item,
+    source: 'YouTube',
+    platform: 'youtube',
+    category: '觀光',
+    sentiment: 'neutral',
+    channel_name: '未知頻道',
+    view_count: 0,
+    thumbnail: ''
+  }));
+}
+
 function facebookPageIdentifier(url) {
   try {
     const parsed = new URL(url);
@@ -247,7 +264,7 @@ async function collectApiSource(source) {
     case 'google_news':
       return tagSource(await serper('news', sourceQuery(source)), source);
     case 'youtube':
-      return serper('videos', sourceQuery(source));
+      return youtubeVideos(sourceQuery(source));
     case 'facebook_page':
       return collectFacebookPageSource(source);
     case 'facebook_group':
@@ -286,30 +303,72 @@ async function collectFromSources(sources) {
 
 async function insertArticles(supabase, candidates) {
   let duplicates = 0;
-  const seen = new Set();
-  const articles = [];
+  const candidateMap = new Map();
 
   for (const candidate of candidates) {
-    if (!candidate.url || seen.has(candidate.url)) {
+    if (!candidate.url) {
       duplicates += 1;
       continue;
     }
-    seen.add(candidate.url);
 
-    articles.push(normalizeArticle(candidate));
+    const existing = candidateMap.get(candidate.url);
+    if (existing) {
+      duplicates += 1;
+      const candidatePriority = candidate.platform === 'youtube' || candidate.post_id ? 2 : 1;
+      const existingPriority = existing.platform === 'youtube' || existing.post_id ? 2 : 1;
+      if (candidatePriority > existingPriority) candidateMap.set(candidate.url, candidate);
+    } else {
+      candidateMap.set(candidate.url, candidate);
+    }
   }
 
+  const articles = Array.from(candidateMap.values()).map(normalizeArticle);
   let inserted = 0;
-  for (let index = 0; index < articles.length; index += 100) {
-    const chunk = articles.slice(index, index + 100);
-    const { data, error } = await supabase
+  for (let index = 0; index < articles.length; index += 50) {
+    const chunk = articles.slice(index, index + 50);
+    const urls = chunk.map((article) => article.url);
+    const { data: existingRows, error: lookupError } = await supabase
       .from('articles')
-      .upsert(chunk, { onConflict: 'url', ignoreDuplicates: true })
-      .select('url');
-    if (error) throw error;
-    const insertedCount = data?.length || 0;
-    inserted += insertedCount;
-    duplicates += chunk.length - insertedCount;
+      .select('*')
+      .in('url', urls);
+    if (lookupError) throw lookupError;
+
+    const existingMap = new Map((existingRows || []).map((row) => [row.url, row]));
+    const rowsToWrite = [];
+
+    for (const article of chunk) {
+      const existing = existingMap.get(article.url);
+      if (!existing) {
+        rowsToWrite.push(article);
+        inserted += 1;
+        continue;
+      }
+
+      duplicates += 1;
+      if (article.platform === 'youtube') {
+        rowsToWrite.push({
+          ...existing,
+          title: article.title || existing.title,
+          source: 'YouTube',
+          platform: 'youtube',
+          category: '觀光',
+          snippet: article.snippet || existing.snippet,
+          summary: article.summary || existing.summary,
+          published_at: article.published_at || existing.published_at,
+          sentiment: 'neutral',
+          channel_name: article.channel_name || existing.channel_name,
+          view_count: article.view_count || existing.view_count || 0,
+          thumbnail: article.thumbnail || existing.thumbnail
+        });
+      }
+    }
+
+    if (rowsToWrite.length > 0) {
+      const { error } = await supabase
+        .from('articles')
+        .upsert(rowsToWrite, { onConflict: 'url' });
+      if (error) throw error;
+    }
   }
 
   return { inserted, duplicates };
@@ -349,7 +408,7 @@ export async function handler(event) {
       tasks.push(
         { source: `Serper Search ${item.keyword}`, run: () => serper('search', item.keyword) },
         { source: `Serper News ${item.keyword}`, run: () => serper('news', `${item.keyword} 新聞`) },
-        { source: `Serper Videos ${item.keyword}`, run: () => serper('videos', item.keyword) }
+        { source: `Serper Videos ${item.keyword}`, run: () => youtubeVideos(item.keyword) }
       );
     }
 
@@ -370,6 +429,7 @@ export async function handler(event) {
     return json(200, {
       ok: true,
       total: candidates.length,
+      youtubeCandidates: candidates.filter((item) => item.platform === 'youtube').length,
       inserted,
       duplicates,
       errors

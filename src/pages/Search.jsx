@@ -37,6 +37,7 @@ export default function Search() {
             <span>新增：<strong>{result.inserted}</strong></span>
             <span>重複略過：<strong>{result.duplicates}</strong></span>
             <span>候選資料：<strong>{result.total}</strong></span>
+            <span>YouTube 候選：<strong>{result.youtubeCandidates || 0}</strong></span>
           </div>
           {result.errors?.length > 0 && (
             <div className="alert">
