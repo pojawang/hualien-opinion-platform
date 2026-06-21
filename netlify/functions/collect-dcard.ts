@@ -11,6 +11,7 @@ export async function handler(event: any) {
 
     const result = await collectDcardPosts({
       supabase: supabaseAdmin(),
+      serperApiKey: process.env.SERPER_API_KEY,
       timeoutMs: Number(process.env.DCARD_REQUEST_TIMEOUT_MS) || 6000,
       delayMs: Number(process.env.DCARD_RATE_LIMIT_MS) || 1500
     });

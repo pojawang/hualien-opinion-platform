@@ -29,6 +29,7 @@ type DcardPost = {
   shareCount?: number;
   forumAlias?: string;
   forumName?: string;
+  url?: string;
   [key: string]: unknown;
 };
 
@@ -37,6 +38,7 @@ type CollectorOptions = {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   delayMs?: number;
+  serperApiKey?: string;
 };
 
 const POSITIVE_WORDS = ['推薦', '好玩', '好吃', '漂亮', '喜歡', '值得'];
@@ -91,6 +93,52 @@ async function fetchForumPosts(
   }
 }
 
+async function fetchSerperPosts(
+  apiKey: string,
+  fetchImpl: typeof fetch,
+  timeoutMs: number
+): Promise<DcardPost[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl('https://google.serper.dev/search', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': apiKey
+      },
+      body: JSON.stringify({
+        q: 'site:dcard.tw/f (花蓮 OR 太魯閣 OR 七星潭 OR 東大門夜市)',
+        gl: 'tw',
+        hl: 'zh-tw',
+        num: 20
+      })
+    });
+    if (!response.ok) throw new Error(`Serper HTTP ${response.status}`);
+    const payload = await response.json();
+    return (payload.organic || []).map((item: any) => {
+      const url = String(item.link || '');
+      const match = url.match(/dcard\.tw\/f\/([^/]+)\/p\/(\d+)/i);
+      if (!match) return null;
+      return {
+        id: match[2],
+        title: item.title || 'Dcard 貼文',
+        excerpt: item.snippet || '',
+        forumAlias: match[1],
+        forumName: match[1],
+        url
+      };
+    }).filter(Boolean) as DcardPost[];
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error('Serper 請求逾時');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function toPostRow(post: DcardPost, forumAlias: string) {
   const externalId = String(post.id || '');
   const content = post.excerpt || post.content || '';
@@ -99,7 +147,7 @@ function toPostRow(post: DcardPost, forumAlias: string) {
   return {
     title: post.title || content.slice(0, 100) || 'Dcard 貼文',
     content,
-    url: `https://www.dcard.tw/f/${post.forumAlias || forumAlias}/p/${externalId}`,
+    url: post.url || `https://www.dcard.tw/f/${post.forumAlias || forumAlias}/p/${externalId}`,
     source: 'dcard',
     source_name: post.forumName || post.forumAlias || forumAlias,
     external_id: externalId,
@@ -119,6 +167,7 @@ export async function collectDcardPosts(options: CollectorOptions) {
   const collected = new Map<string, ReturnType<typeof toPostRow>>();
   const errors: Array<{ forum: string; message: string }> = [];
   let scanned = 0;
+  let fallback: string | null = null;
 
   for (let index = 0; index < DCARD_FORUMS.length; index += 1) {
     const forum = DCARD_FORUMS[index];
@@ -131,6 +180,21 @@ export async function collectDcardPosts(options: CollectorOptions) {
         collected.set(row.external_id, row);
       }
     } catch (error: any) {
+      if (String(error?.message).includes('HTTP 403') && options.serperApiKey) {
+        try {
+          const posts = await fetchSerperPosts(options.serperApiKey, fetchImpl, timeoutMs);
+          scanned += posts.length;
+          for (const post of posts) {
+            if (!post.id || !matchesHualien(post)) continue;
+            const row = toPostRow(post, post.forumAlias || forum);
+            collected.set(row.external_id, row);
+          }
+          fallback = 'serper';
+        } catch (fallbackError: any) {
+          errors.push({ forum: 'serper', message: fallbackError?.message || 'Dcard 備援搜尋失敗' });
+        }
+        break;
+      }
       errors.push({ forum, message: error?.message || '未知錯誤' });
     }
 
@@ -152,5 +216,5 @@ export async function collectDcardPosts(options: CollectorOptions) {
     upserted += data?.length || 0;
   }
 
-  return { scanned, matched: rows.length, upserted, errors };
+  return { scanned, matched: rows.length, upserted, fallback, errors };
 }

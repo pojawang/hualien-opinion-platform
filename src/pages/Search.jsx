@@ -63,6 +63,7 @@ export default function Search() {
             <span>PTT 新增或更新：<strong>{result.ptt?.upserted || 0}</strong></span>
           </div>
           {result.ptt?.skipped && <div className="notice">PTT 尚未啟用，請先在來源管理新增一筆 PTT 來源。</div>}
+          {result.dcard?.fallback === 'serper' && <div className="notice">Dcard API 拒絕連線，已自動改用 Serper 公開搜尋結果。</div>}
           {result.collectorErrors?.length > 0 && (
             <div className="alert">{result.collectorErrors.map((message) => <p key={message}>{message}</p>)}</div>
           )}
