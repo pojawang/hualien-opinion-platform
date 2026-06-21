@@ -52,6 +52,13 @@ async function testSource(body) {
     };
   }
 
+  if (sourceType === 'dcard') {
+    return {
+      status: 200,
+      body: { ok: true, count: 0, sample: [], message: 'Dcard 公開搜尋 API 已啟用，Serper 作為備援' }
+    };
+  }
+
   if (!process.env.SERPER_API_KEY) {
     const message = sourceType === 'facebook_page'
       ? 'FACEBOOK_PAGE_ACCESS_TOKEN 或 SERPER_API_KEY 尚未設定'

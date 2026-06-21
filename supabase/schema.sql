@@ -51,6 +51,9 @@ create table if not exists articles (
   channel_name text,
   view_count bigint default 0,
   thumbnail text,
+  excerpt text,
+  like_count integer default 0,
+  comment_count integer default 0,
   published_at text,
   sentiment text check (sentiment in ('positive', 'neutral', 'negative')),
   importance text check (importance in ('low', 'medium', 'high', 'urgent')),
@@ -73,6 +76,7 @@ create index if not exists idx_articles_is_broadcasted on articles(is_broadcaste
 create index if not exists idx_articles_post_id on articles(post_id) where post_id is not null;
 create index if not exists idx_articles_channel_name on articles(channel_name) where channel_name is not null;
 create index if not exists idx_articles_view_count on articles(view_count desc) where platform = 'youtube';
+create index if not exists idx_articles_dcard_engagement on articles((like_count + comment_count) desc) where platform = 'dcard';
 
 insert into keywords (keyword, category, enabled) values
   ('花蓮', '其他', true),

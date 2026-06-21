@@ -91,6 +91,31 @@ function buildYouTubeStats(articles) {
   };
 }
 
+function buildDcardStats(articles, keywords) {
+  const posts = articles.filter((item) => item.platform === 'dcard');
+  const discussionKeywords = keywords
+    .map((keyword) => ({
+      name: keyword,
+      value: posts.filter((post) => matchesKeyword(post, keyword)).length
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'zh-Hant'))
+    .slice(0, 10);
+
+  return {
+    count: posts.length,
+    topPosts: posts
+      .slice()
+      .sort((a, b) => {
+        const engagementA = (Number(a.like_count) || 0) + (Number(a.comment_count) || 0);
+        const engagementB = (Number(b.like_count) || 0) + (Number(b.comment_count) || 0);
+        return engagementB - engagementA;
+      })
+      .slice(0, 10),
+    discussionKeywords
+  };
+}
+
 export async function handler(event) {
   try {
     guard(event);
@@ -143,6 +168,7 @@ export async function handler(event) {
       .sort((a, b) => (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9))
       .slice(0, 5);
     const youtubeStats = buildYouTubeStats(articles);
+    const dcardStats = buildDcardStats(articles, keywords);
 
     return json(200, {
       keywords,
@@ -156,6 +182,9 @@ export async function handler(event) {
       youtubeVideoCount: youtubeStats.count,
       youtubeTopChannels: youtubeStats.channels,
       youtubeTopVideos: youtubeStats.topVideos,
+      dcardCount: dcardStats.count,
+      dcardTopPosts: dcardStats.topPosts,
+      dcardDiscussionKeywords: dcardStats.discussionKeywords,
       categoryCounts: countBy(articles, 'category'),
       sourceCounts: countBy(articles, 'platform', 'website')
         .sort((a, b) => b.value - a.value),

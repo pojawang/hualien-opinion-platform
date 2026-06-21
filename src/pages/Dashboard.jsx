@@ -90,6 +90,7 @@ export default function Dashboard() {
         <StatCard label="已推播" value={stats.broadcastedCount} />
         <StatCard label="Facebook 貼文" value={stats.facebookPostCount || 0} />
         <StatCard label="YouTube 影片" value={stats.youtubeVideoCount || 0} />
+        <StatCard label="Dcard 聲量" value={stats.dcardCount || 0} />
       </section>
       <section className="panel summaryPanel">
         <div className="sectionHeading">
@@ -126,6 +127,33 @@ export default function Dashboard() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>Dcard 熱門文章排行</h3>
+          <div className="warningList">
+            {(stats.dcardTopPosts || []).map((post) => (
+              <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(post.title, '未命名文章')}</span>
+                <small>{numberFormat.format(Number(post.like_count) || 0)} 個讚 · {numberFormat.format(Number(post.comment_count) || 0)} 則留言</small>
+              </a>
+            ))}
+          </div>
+          {stats.dcardTopPosts?.length === 0 && <p className="emptyState">目前沒有 Dcard 文章資料。</p>}
+        </div>
+        <div className="panel">
+          <h3>Dcard 熱門討論關鍵字</h3>
+          <ol className="keywordRanking">
+            {(stats.dcardDiscussionKeywords || []).map((item, index) => (
+              <li key={item.name}>
+                <strong>{index + 1}</strong>
+                <span>{item.name}</span>
+                <b>{item.value} 則</b>
+              </li>
+            ))}
+          </ol>
+          {stats.dcardDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 Dcard 關鍵字資料。</p>}
         </div>
       </section>
       <section className="chartGrid">

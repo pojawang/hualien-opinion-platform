@@ -101,6 +101,69 @@ async function youtubeVideos(query) {
   }));
 }
 
+function dcardPostUrl(post) {
+  if (post.url) return post.url.startsWith('http') ? post.url : `https://www.dcard.tw${post.url}`;
+  if (!post.id) return '';
+  const forum = post.forumAlias || post.forum?.alias || 'topics';
+  return `https://www.dcard.tw/f/${forum}/p/${post.id}`;
+}
+
+async function dcardPosts(query) {
+  const params = new URLSearchParams({ query, limit: '10' });
+  const response = await fetchWithTimeout(
+    `https://www.dcard.tw/service/api/v2/search/posts?${params.toString()}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'zh-TW,zh;q=0.9',
+        Referer: `https://www.dcard.tw/search?query=${encodeURIComponent(query)}`,
+        'User-Agent': 'Mozilla/5.0 (compatible; HualienOpinionPlatform/1.0)'
+      }
+    }
+  );
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+  const payload = await response.json();
+  const posts = Array.isArray(payload) ? payload : payload.data || [];
+  return posts.map((post) => ({
+    title: post.title || post.excerpt || 'Dcard 貼文',
+    url: dcardPostUrl(post),
+    source: 'Dcard',
+    platform: 'dcard',
+    excerpt: post.excerpt || '',
+    snippet: post.excerpt || '',
+    summary: post.excerpt || '',
+    like_count: post.likeCount ?? post.like_count ?? 0,
+    comment_count: post.commentCount ?? post.comment_count ?? 0,
+    published_at: post.createdAt || post.publishedAt || ''
+  })).filter((post) => post.url);
+}
+
+async function dcardSearch(query) {
+  let apiError = null;
+  try {
+    const posts = await dcardPosts(query);
+    if (posts.length > 0) return posts;
+  } catch (err) {
+    apiError = err;
+  }
+
+  const fallback = await serper('search', `site:dcard.tw/f ${query}`);
+  if (fallback.length > 0) {
+    return fallback.map((item) => ({
+      ...item,
+      source: 'Dcard',
+      platform: 'dcard',
+      excerpt: item.snippet || '',
+      like_count: 0,
+      comment_count: 0
+    }));
+  }
+
+  if (apiError) throw new Error(`Dcard API 失敗：${apiError.message}`);
+  return [];
+}
+
 function facebookPageIdentifier(url) {
   try {
     const parsed = new URL(url);
@@ -274,7 +337,7 @@ async function collectApiSource(source) {
     case 'ptt':
       return tagSource(await serper('search', sourceQuery(source, 'site:ptt.cc')), source);
     case 'dcard':
-      return tagSource(await serper('search', sourceQuery(source, 'site:dcard.tw')), source);
+      return [];
     default:
       throw new Error(`不支援的來源類型：${source.source_type}`);
   }
@@ -314,8 +377,8 @@ async function insertArticles(supabase, candidates) {
     const existing = candidateMap.get(candidate.url);
     if (existing) {
       duplicates += 1;
-      const candidatePriority = candidate.platform === 'youtube' || candidate.post_id ? 2 : 1;
-      const existingPriority = existing.platform === 'youtube' || existing.post_id ? 2 : 1;
+      const candidatePriority = ['youtube', 'dcard'].includes(candidate.platform) || candidate.post_id ? 2 : 1;
+      const existingPriority = ['youtube', 'dcard'].includes(existing.platform) || existing.post_id ? 2 : 1;
       if (candidatePriority > existingPriority) candidateMap.set(candidate.url, candidate);
     } else {
       candidateMap.set(candidate.url, candidate);
@@ -359,6 +422,19 @@ async function insertArticles(supabase, candidates) {
           channel_name: article.channel_name || existing.channel_name,
           view_count: article.view_count || existing.view_count || 0,
           thumbnail: article.thumbnail || existing.thumbnail
+        });
+      } else if (article.platform === 'dcard') {
+        rowsToUpdate.push({
+          ...existing,
+          title: article.title || existing.title,
+          source: 'Dcard',
+          platform: 'dcard',
+          snippet: article.snippet || existing.snippet,
+          summary: article.summary || existing.summary,
+          excerpt: article.excerpt || existing.excerpt,
+          published_at: article.published_at || existing.published_at,
+          like_count: article.like_count || existing.like_count || 0,
+          comment_count: article.comment_count || existing.comment_count || 0
         });
       }
     }
@@ -414,6 +490,7 @@ export async function handler(event) {
     const candidates = [];
     const errors = [];
     const tasks = [];
+    const dcardEnabled = (sources || []).some((source) => source.source_type === 'dcard');
 
     for (const item of keywords || []) {
       tasks.push(
@@ -421,6 +498,9 @@ export async function handler(event) {
         { source: `Serper News ${item.keyword}`, run: () => serper('news', `${item.keyword} 新聞`) },
         { source: `Serper Videos ${item.keyword}`, run: () => youtubeVideos(item.keyword) }
       );
+      if (dcardEnabled) {
+        tasks.push({ source: `Dcard ${item.keyword}`, run: () => dcardSearch(item.keyword) });
+      }
     }
 
     await mapWithConcurrency(tasks, 6, async (task) => {
@@ -441,6 +521,7 @@ export async function handler(event) {
       ok: true,
       total: candidates.length,
       youtubeCandidates: candidates.filter((item) => item.platform === 'youtube').length,
+      dcardCandidates: candidates.filter((item) => item.platform === 'dcard').length,
       inserted,
       duplicates,
       errors
