@@ -12,7 +12,28 @@ export default function Search() {
     setResult(null);
 
     try {
-      setResult(await apiFetch('search', { method: 'POST' }));
+      const [searchResult, dcardResult, pttResult] = await Promise.allSettled([
+        apiFetch('search', { method: 'POST' }),
+        apiFetch('collect-dcard', { method: 'POST' }),
+        apiFetch('collect-ptt', { method: 'POST' })
+      ]);
+
+      if (searchResult.status === 'rejected') throw searchResult.reason;
+      const collectorErrors = [];
+      if (dcardResult.status === 'rejected') collectorErrors.push(`Dcard：${dcardResult.reason.message}`);
+      if (pttResult.status === 'rejected') collectorErrors.push(`PTT：${pttResult.reason.message}`);
+      if (dcardResult.status === 'fulfilled') {
+        collectorErrors.push(...(dcardResult.value.errors || []).map((item) => `Dcard ${item.forum}：${item.message}`));
+      }
+      if (pttResult.status === 'fulfilled') {
+        collectorErrors.push(...(pttResult.value.errors || []).map((item) => `PTT ${item.board}：${item.message}`));
+      }
+      setResult({
+        ...searchResult.value,
+        dcard: dcardResult.status === 'fulfilled' ? dcardResult.value : null,
+        ptt: pttResult.status === 'fulfilled' ? pttResult.value : null,
+        collectorErrors
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -38,7 +59,13 @@ export default function Search() {
             <span>重複略過：<strong>{result.duplicates}</strong></span>
             <span>候選資料：<strong>{result.total}</strong></span>
             <span>YouTube 候選：<strong>{result.youtubeCandidates || 0}</strong></span>
+            <span>Dcard 新增或更新：<strong>{result.dcard?.upserted || 0}</strong></span>
+            <span>PTT 新增或更新：<strong>{result.ptt?.upserted || 0}</strong></span>
           </div>
+          {result.ptt?.skipped && <div className="notice">PTT 尚未啟用，請先在來源管理新增一筆 PTT 來源。</div>}
+          {result.collectorErrors?.length > 0 && (
+            <div className="alert">{result.collectorErrors.map((message) => <p key={message}>{message}</p>)}</div>
+          )}
           {result.errors?.length > 0 && (
             <div className="alert">
               {result.errors.map((item) => <p key={`${item.source}-${item.message}`}>{item.source}: {item.message}</p>)}

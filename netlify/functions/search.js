@@ -9,19 +9,33 @@ import {
   upsertDefaultsIfEmpty
 } from './_utils.js';
 
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 async function serper(endpoint, query) {
   if (!process.env.SERPER_API_KEY) return [];
 
-  const response = await fetchWithTimeout(`https://google.serper.dev/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-KEY': process.env.SERPER_API_KEY
-    },
-    body: JSON.stringify({ q: query, gl: 'tw', hl: 'zh-tw', num: 10 })
-  });
+  let response;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    response = await fetchWithTimeout(`https://google.serper.dev/${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': process.env.SERPER_API_KEY
+      },
+      body: JSON.stringify({ q: query, gl: 'tw', hl: 'zh-tw', num: 10 })
+    });
+
+    if (response.status !== 429 || attempt === 1) break;
+    const retryAfter = Number(response.headers?.get('retry-after')) || 1;
+    await wait(Math.min(3000, Math.max(1000, retryAfter * 1000)));
+  }
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('Serper 額度或呼叫速率已達上限（429），請稍後再試或檢查 Serper 方案額度');
+    }
     throw new Error(`Serper ${endpoint} 失敗：${response.status}`);
   }
 
@@ -272,7 +286,6 @@ async function collectApiSource(source) {
     case 'google_reviews':
       return tagSource(await serper('search', `${sourceQuery(source)} Google 評論`), source);
     case 'ptt':
-      return tagSource(await serper('search', sourceQuery(source, 'site:ptt.cc')), source);
     case 'dcard':
       return [];
     default:
@@ -423,15 +436,27 @@ export async function handler(event) {
       );
     }
 
-    await mapWithConcurrency(tasks, 6, async (task) => {
+    let serperBlocked = false;
+    await mapWithConcurrency(tasks, 2, async (task) => {
+      if (serperBlocked) return;
       try {
         candidates.push(...await task.run());
       } catch (err) {
+        if (err.message.includes('429')) {
+          serperBlocked = true;
+          if (!errors.some((item) => item.source === 'Serper API')) {
+            errors.push({ source: 'Serper API', message: err.message });
+          }
+          return;
+        }
         errors.push({ source: task.source, message: err.message });
       }
     });
 
-    const sourceResults = await collectFromSources(sources || []);
+    const sourcesToCollect = serperBlocked
+      ? (sources || []).filter((source) => ['rss', 'sitemap', 'website', 'dcard', 'ptt'].includes(source.source_type))
+      : sources || [];
+    const sourceResults = await collectFromSources(sourcesToCollect);
     candidates.push(...sourceResults.results);
     errors.push(...sourceResults.errors);
 
