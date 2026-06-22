@@ -18,6 +18,39 @@ function dateKey(value = new Date()) {
   }).format(new Date(value));
 }
 
+function publishedTimestamp(value, now = new Date()) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+
+  const relativeMatch = text.match(/(\d+)\s*(分鐘|小時|天|日|週|周|個月|月|年|minutes?|hours?|days?|weeks?|months?|years?)\s*(?:前|ago)/i);
+  if (relativeMatch) {
+    const amount = Number(relativeMatch[1]);
+    const unit = relativeMatch[2].toLowerCase();
+    const date = new Date(now);
+    if (['個月', '月', 'month', 'months'].includes(unit)) date.setMonth(date.getMonth() - amount);
+    else if (['年', 'year', 'years'].includes(unit)) date.setFullYear(date.getFullYear() - amount);
+    else {
+      const unitMilliseconds = ['週', '周', 'week', 'weeks'].includes(unit)
+        ? 7 * 86400000
+        : ['天', '日', 'day', 'days'].includes(unit)
+          ? 86400000
+          : ['小時', 'hour', 'hours'].includes(unit)
+            ? 3600000
+            : 60000;
+      date.setTime(date.getTime() - amount * unitMilliseconds);
+    }
+    return date.getTime();
+  }
+
+  const normalized = text
+    .replace(/年/g, '-')
+    .replace(/月/g, '-')
+    .replace(/日/g, '')
+    .replace(/\//g, '-');
+  const timestamp = Date.parse(normalized);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
 function articleText(article) {
   return `${article.title || ''} ${article.content || ''} ${article.snippet || ''} ${article.summary || ''} ${article.source || ''}`.toLowerCase();
 }
@@ -199,10 +232,10 @@ export async function handler(event) {
     const negativeAlerts = [...negativeArticles, ...filteredSocialPosts]
       .filter((item) => {
         if (item.sentiment !== 'negative') return false;
-        const publishedTime = Date.parse(item.published_at || '');
-        const createdTime = Date.parse(item.created_at || '');
-        const timestamp = Number.isNaN(publishedTime) ? createdTime : publishedTime;
-        return !Number.isNaN(timestamp) && timestamp >= negativeCutoff.getTime();
+        const timestamp = publishedTimestamp(item.published_at);
+        return timestamp !== null
+          && timestamp >= negativeCutoff.getTime()
+          && timestamp <= Date.now() + 86400000;
       })
       .sort((a, b) => (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9))
       .slice(0, 10);

@@ -132,6 +132,36 @@ export default function Dashboard() {
       </section>
       <section className="chartGrid">
         <div className="panel">
+          <h3>熱門關鍵字排行榜</h3>
+          <ol className="keywordRanking">
+            {stats.popularKeywords.map((item, index) => (
+              <li key={item.name}>
+                <strong>{index + 1}</strong>
+                <span>{item.name}</span>
+                <b>{item.value} 則</b>
+              </li>
+            ))}
+          </ol>
+          {stats.popularKeywords.length === 0 && <p className="emptyState">目前沒有關鍵字聲量。</p>}
+        </div>
+        <div className="panel warningPanel">
+          <div className="sectionHeading">
+            <h3>近三個月負評預警</h3>
+            <span>{stats.negativeAlerts.length} 則</span>
+          </div>
+          <div className="warningList">
+            {stats.negativeAlerts.map((article) => (
+              <a key={article.id} href={article.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(article.title, '未命名文章')}</span>
+                <small>{article.category || '其他'} · 重要程度：{importanceLabel(article.importance)}</small>
+              </a>
+            ))}
+          </div>
+          {stats.negativeAlerts.length === 0 && <p className="emptyState">近三個月沒有負面預警。</p>}
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
           <h3>Dcard 熱門文章排行</h3>
           <div className="warningList">
             {(stats.dcardTopPosts || []).map((post) => (
@@ -213,36 +243,6 @@ export default function Dashboard() {
             ))}
           </div>
           {stats.youtubeTopVideos?.length === 0 && <p className="emptyState">目前沒有 YouTube 觀看數資料。</p>}
-        </div>
-      </section>
-      <section className="chartGrid">
-        <div className="panel">
-          <h3>熱門關鍵字排行榜</h3>
-          <ol className="keywordRanking">
-            {stats.popularKeywords.map((item, index) => (
-              <li key={item.name}>
-                <strong>{index + 1}</strong>
-                <span>{item.name}</span>
-                <b>{item.value} 則</b>
-              </li>
-            ))}
-          </ol>
-          {stats.popularKeywords.length === 0 && <p className="emptyState">目前沒有關鍵字聲量。</p>}
-        </div>
-        <div className="panel warningPanel">
-          <div className="sectionHeading">
-            <h3>近三個月負評預警</h3>
-            <span>{stats.negativeAlerts.length} 則</span>
-          </div>
-          <div className="warningList">
-            {stats.negativeAlerts.map((article) => (
-              <a key={article.id} href={article.url} target="_blank" rel="noreferrer">
-                <span>{cleanArticleText(article.title, '未命名文章')}</span>
-                <small>{article.category || '其他'} · 重要程度：{importanceLabel(article.importance)}</small>
-              </a>
-            ))}
-          </div>
-          {stats.negativeAlerts.length === 0 && <p className="emptyState">近三個月沒有負面預警。</p>}
         </div>
       </section>
       <section className="chartGrid">
