@@ -241,7 +241,7 @@ async function upsertRows(rows) {
   for (const row of rows) {
     const previous = byUrl.get(row.url) || byIdentity.get(`${row.source}\n${row.title}`);
     if (!previous) {
-      inserts.push(row);
+      inserts.push({ id: crypto.randomUUID(), ...row });
       continue;
     }
     const { error } = await supabase.from('articles').update({
