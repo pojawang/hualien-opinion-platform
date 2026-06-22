@@ -60,7 +60,7 @@ async function serper(endpoint, query) {
       channel_name: typeof item.channel === 'string'
         ? item.channel
         : item.channel?.name || item.source || '未知頻道',
-      view_count: parseViewCount(item.views ?? item.viewCount ?? item.snippet),
+      view_count: 0,
       thumbnail: item.imageUrl || item.thumbnail || item.image || ''
     })).filter((item) => isYouTubeUrl(item.url));
   }
@@ -95,6 +95,66 @@ function isYouTubeUrl(value) {
     return hostname === 'youtube.com' || hostname === 'm.youtube.com' || hostname === 'youtu.be';
   } catch {
     return false;
+  }
+}
+
+function youtubeVideoId(value) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.replace(/^www\./, '');
+    if (hostname === 'youtu.be') return url.pathname.split('/').filter(Boolean)[0] || '';
+    if (hostname === 'youtube.com' || hostname === 'm.youtube.com') {
+      if (url.pathname === '/watch') return url.searchParams.get('v') || '';
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (['shorts', 'live', 'embed'].includes(parts[0])) return parts[1] || '';
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+async function enrichYouTubeMetadata(candidates) {
+  const videosById = new Map();
+  for (const candidate of candidates) {
+    if (candidate.platform !== 'youtube') continue;
+    const id = youtubeVideoId(candidate.url);
+    if (!id) continue;
+    const group = videosById.get(id) || [];
+    group.push(candidate);
+    videosById.set(id, group);
+  }
+
+  const ids = Array.from(videosById.keys());
+  if (ids.length === 0) return;
+
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) throw new Error('YOUTUBE_API_KEY 尚未設定，無法取得官方觀看數');
+
+  for (let index = 0; index < ids.length; index += 50) {
+    const batch = ids.slice(index, index + 50);
+    const params = new URLSearchParams({
+      part: 'statistics,snippet',
+      id: batch.join(','),
+      key: apiKey
+    });
+    const response = await fetchWithTimeout(`https://www.googleapis.com/youtube/v3/videos?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error?.message || `YouTube Data API 失敗：${response.status}`);
+    }
+
+    for (const item of payload.items || []) {
+      const snippet = item.snippet || {};
+      const thumbnails = snippet.thumbnails || {};
+      for (const candidate of videosById.get(item.id) || []) {
+        candidate.title = snippet.title || candidate.title;
+        candidate.channel_name = snippet.channelTitle || candidate.channel_name;
+        candidate.published_at = snippet.publishedAt || candidate.published_at;
+        candidate.thumbnail = thumbnails.maxres?.url || thumbnails.high?.url || thumbnails.medium?.url || thumbnails.default?.url || candidate.thumbnail;
+        candidate.view_count = Math.max(0, Number.parseInt(item.statistics?.viewCount, 10) || 0);
+      }
+    }
   }
 }
 
@@ -459,6 +519,12 @@ export async function handler(event) {
     const sourceResults = await collectFromSources(sourcesToCollect);
     candidates.push(...sourceResults.results);
     errors.push(...sourceResults.errors);
+
+    try {
+      await enrichYouTubeMetadata(candidates);
+    } catch (err) {
+      errors.push({ source: 'YouTube Data API', message: err.message });
+    }
 
     const { inserted, duplicates } = await insertArticles(supabase, candidates);
 
