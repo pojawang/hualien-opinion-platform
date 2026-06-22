@@ -214,8 +214,8 @@ function buildFacebookStats(articles) {
     topPosts: posts
       .slice()
       .sort((a, b) => {
-        const scoreA = (Number(a.like_count) || 0) + (Number(a.comment_count) || 0) * 2 + (Number(a.share_count) || 0) * 3;
-        const scoreB = (Number(b.like_count) || 0) + (Number(b.comment_count) || 0) * 2 + (Number(b.share_count) || 0) * 3;
+        const scoreA = Number(a.hotness_score) || (Number(a.like_count) || 0) + (Number(a.comment_count) || 0) * 2 + (Number(a.share_count) || 0) * 3;
+        const scoreB = Number(b.hotness_score) || (Number(b.like_count) || 0) + (Number(b.comment_count) || 0) * 2 + (Number(b.share_count) || 0) * 3;
         return scoreB - scoreA;
       })
       .slice(0, 10),

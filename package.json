@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
     "preview": "vite preview",
-    "netlify:dev": "netlify dev"
+    "netlify:dev": "netlify dev",
+    "collect:facebook": "node scripts/collect-facebook-playwright.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -20,6 +21,7 @@
     "recharts": "^3.4.1"
   },
   "devDependencies": {
+    "playwright": "^1.61.0",
     "vite": "^8.0.16"
   }
 }

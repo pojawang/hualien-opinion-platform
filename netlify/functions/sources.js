@@ -45,10 +45,10 @@ async function testSource(body) {
     };
   }
 
-  if (sourceType === 'facebook_page' && process.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+  if (sourceType === 'facebook_page') {
     return {
       status: 200,
-      body: { ok: true, count: 0, sample: [], message: 'Facebook Graph API 設定完成' }
+      body: { ok: true, count: 0, sample: [], message: '請改由「Facebook監測」管理，系統使用 GitHub Actions Playwright 每日巡查' }
     };
   }
 
@@ -67,10 +67,7 @@ async function testSource(body) {
   }
 
   if (!process.env.SERPER_API_KEY) {
-    const message = sourceType === 'facebook_page'
-      ? 'FACEBOOK_PAGE_ACCESS_TOKEN 或 SERPER_API_KEY 尚未設定'
-      : 'SERPER_API_KEY 尚未設定';
-    return { status: 400, body: { error: message } };
+    return { status: 400, body: { error: 'SERPER_API_KEY 尚未設定' } };
   }
 
   return {

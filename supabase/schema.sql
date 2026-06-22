@@ -55,6 +55,9 @@ create table if not exists articles (
   like_count integer default 0,
   comment_count integer default 0,
   share_count integer default 0,
+  hotness_score numeric(10, 2) default 0,
+  analysis_keywords text[] default '{}',
+  ai_analyzed boolean default false,
   place_name text,
   rating numeric(3, 2),
   review_count integer default 0,
@@ -115,6 +118,7 @@ create index if not exists idx_articles_channel_name on articles(channel_name) w
 create index if not exists idx_articles_view_count on articles(view_count desc) where platform = 'youtube';
 create index if not exists idx_articles_dcard_engagement on articles((like_count + comment_count) desc) where platform = 'dcard';
 create index if not exists idx_articles_google_reviews_rating on articles(rating desc) where platform = 'google_reviews';
+create index if not exists idx_articles_facebook_hotness on articles(hotness_score desc) where platform = 'facebook_page';
 create index if not exists idx_facebook_pages_enabled on facebook_pages(enabled);
 create index if not exists idx_posts_source on posts(source);
 create index if not exists idx_posts_published_at on posts(published_at desc);

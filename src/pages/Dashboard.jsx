@@ -215,6 +215,8 @@ export default function Dashboard() {
                 <span>{cleanArticleText(post.title, 'Facebook 貼文')}</span>
                 <small>
                   {post.source || 'Facebook 粉專'} · {numberFormat.format(Number(post.like_count) || 0)} 讚 · {numberFormat.format(Number(post.comment_count) || 0)} 留言 · {numberFormat.format(Number(post.share_count) || 0)} 分享
+                  {Number(post.hotness_score) > 0 ? ` · 熱門度 ${numberFormat.format(Number(post.hotness_score))}` : ''}
+                  {post.analysis_keywords?.length ? ` · 關鍵字：${post.analysis_keywords.join('、')}` : ''}
                 </small>
               </a>
             )}

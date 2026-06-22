@@ -6,7 +6,6 @@ const categories = ['其他', '觀光', '美食', '住宿', '交通', '活動', 
 export default function FacebookPages() {
   const [pages, setPages] = useState([]);
   const [pageUrl, setPageUrl] = useState('');
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -57,24 +56,6 @@ export default function FacebookPages() {
     }
   }
 
-  async function collectNow() {
-    setLoading(true);
-    setError('');
-    setMessage('');
-    try {
-      const result = await apiFetch('collect-facebook-pages', { method: 'POST' });
-      setMessage(result.errors?.length
-        ? `巡查完成：找到 ${result.matched || 0} 則，新增或更新 ${result.upserted || 0} 則；${result.errors.length} 個來源讀取失敗。`
-        : `巡查完成：找到 ${result.matched || 0} 則，新增或更新 ${result.upserted || 0} 則。`);
-      if (result.errors?.length) setError(result.errors.map((item) => `${item.page}：${item.message}`).join('；'));
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="pageStack">
       <header className="pageHeader">
@@ -82,7 +63,7 @@ export default function FacebookPages() {
           <h2>Facebook 監測來源</h2>
           <p>管理公開粉專並蒐集最近 7 日貼文</p>
         </div>
-        <button type="button" onClick={collectNow} disabled={loading}>{loading ? '巡查中...' : '立即巡查'}</button>
+        <span className="scheduleStatus">每日 06:15 自動巡查</span>
       </header>
       {error && <div className="alert">{error}</div>}
       {message && <div className="notice">{message}</div>}
