@@ -54,6 +54,7 @@ create table if not exists articles (
   excerpt text,
   like_count integer default 0,
   comment_count integer default 0,
+  share_count integer default 0,
   place_name text,
   rating numeric(3, 2),
   review_count integer default 0,
@@ -65,6 +66,16 @@ create table if not exists articles (
   status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
   is_broadcasted boolean default false,
   created_at timestamp default now()
+);
+
+create table if not exists facebook_pages (
+  id uuid primary key default gen_random_uuid(),
+  page_name text,
+  page_url text unique not null,
+  category text default '其他',
+  enabled boolean default true,
+  last_fetch_at timestamptz,
+  created_at timestamptz default now()
 );
 
 create table if not exists broadcasts (
@@ -104,6 +115,7 @@ create index if not exists idx_articles_channel_name on articles(channel_name) w
 create index if not exists idx_articles_view_count on articles(view_count desc) where platform = 'youtube';
 create index if not exists idx_articles_dcard_engagement on articles((like_count + comment_count) desc) where platform = 'dcard';
 create index if not exists idx_articles_google_reviews_rating on articles(rating desc) where platform = 'google_reviews';
+create index if not exists idx_facebook_pages_enabled on facebook_pages(enabled);
 create index if not exists idx_posts_source on posts(source);
 create index if not exists idx_posts_published_at on posts(published_at desc);
 create index if not exists idx_posts_engagement on posts((like_count + comment_count) desc) where source = 'dcard';

@@ -102,6 +102,7 @@ export default function Dashboard() {
   if (!stats) return <div className="panel">載入中...</div>;
 
   const sentimentCounts = localizeSentimentCounts(stats.sentimentCounts);
+  const facebookSentimentCounts = localizeSentimentCounts(stats.facebookSentimentCounts || []);
   const sourceCounts = (stats.sourceCounts || []).map((item) => ({
     ...item,
     name: sourceTypeLabel(item.name)
@@ -177,6 +178,61 @@ export default function Dashboard() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>Facebook 聲量趨勢</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={stats.facebookVolumeTrend || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis allowDecimals={false} />
+              <Tooltip formatter={(value) => [`${value} 則`, 'Facebook 聲量']} />
+              <Line type="monotone" dataKey="value" name="Facebook 聲量" stroke="#1877f2" strokeWidth={3} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="panel">
+          <h3>Facebook 情緒分析</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart>
+              <Pie data={facebookSentimentCounts} dataKey="value" nameKey="name" outerRadius={90} label>
+                {facebookSentimentCounts.map((entry, index) => <Cell key={entry.name} fill={pieColors[index % pieColors.length]} />)}
+              </Pie>
+              <Legend />
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>Facebook 熱門貼文 TOP 10</h3>
+          <PagedItems items={stats.facebookTopPosts || []} className="warningList">
+            {(post) => (
+              <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(post.title, 'Facebook 貼文')}</span>
+                <small>
+                  {post.source || 'Facebook 粉專'} · {numberFormat.format(Number(post.like_count) || 0)} 讚 · {numberFormat.format(Number(post.comment_count) || 0)} 留言 · {numberFormat.format(Number(post.share_count) || 0)} 分享
+                </small>
+              </a>
+            )}
+          </PagedItems>
+          {stats.facebookTopPosts?.length === 0 && <p className="emptyState">目前沒有 Facebook 貼文資料。</p>}
+        </div>
+        <div className="panel">
+          <h3>Facebook 粉專排行</h3>
+          <PagedItems items={stats.facebookPageRanking || []} className="keywordRanking" ordered>
+            {(page, index, globalIndex) => (
+              <li key={page.name}>
+                <strong>{globalIndex + 1}</strong>
+                <span>{page.name}</span>
+                <b>{page.value} 則</b>
+              </li>
+            )}
+          </PagedItems>
+          {stats.facebookPageRanking?.length === 0 && <p className="emptyState">目前沒有 Facebook 粉專資料。</p>}
         </div>
       </section>
       <section className="chartGrid">

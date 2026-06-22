@@ -7,6 +7,7 @@ import Articles from './pages/Articles.jsx';
 import Keywords from './pages/Keywords.jsx';
 import Sources from './pages/Sources.jsx';
 import Reports from './pages/Reports.jsx';
+import FacebookPages from './pages/FacebookPages.jsx';
 import { getToken } from './lib/supabase.js';
 
 function PrivateRoute({ children }) {
@@ -31,6 +32,7 @@ export default function App() {
       <Route path="/articles" element={<PrivateRoute><Articles /></PrivateRoute>} />
       <Route path="/keywords" element={<PrivateRoute><Keywords /></PrivateRoute>} />
       <Route path="/sources" element={<PrivateRoute><Sources /></PrivateRoute>} />
+      <Route path="/facebook-pages" element={<PrivateRoute><FacebookPages /></PrivateRoute>} />
       <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

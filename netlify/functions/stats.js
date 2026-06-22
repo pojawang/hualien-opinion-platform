@@ -186,6 +186,45 @@ function buildGoogleReviewStats(articles) {
   };
 }
 
+function buildFacebookStats(articles) {
+  const posts = articles.filter((item) => item.platform === 'facebook_page' && item.post_id);
+  const trendDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(Date.now() - (6 - index) * 86400000);
+    const key = dateKey(date);
+    return { key, name: key.slice(5).replace('-', '/'), value: 0 };
+  });
+  const trendMap = new Map(trendDays.map((day) => [day.key, day]));
+  const pageMap = new Map();
+
+  for (const post of posts) {
+    const publishedKey = dateKey(post.published_at || post.created_at);
+    const day = trendMap.get(publishedKey);
+    if (day) day.value += 1;
+    const pageName = post.source || 'Facebook 粉專';
+    const current = pageMap.get(pageName) || { name: pageName, value: 0, engagement: 0 };
+    current.value += 1;
+    current.engagement += (Number(post.like_count) || 0) + (Number(post.comment_count) || 0) + (Number(post.share_count) || 0);
+    pageMap.set(pageName, current);
+  }
+
+  return {
+    count: posts.length,
+    volumeTrend: trendDays.map(({ name, value }) => ({ name, value })),
+    sentimentCounts: countBy(posts, 'sentiment', 'neutral'),
+    topPosts: posts
+      .slice()
+      .sort((a, b) => {
+        const scoreA = (Number(a.like_count) || 0) + (Number(a.comment_count) || 0) * 2 + (Number(a.share_count) || 0) * 3;
+        const scoreB = (Number(b.like_count) || 0) + (Number(b.comment_count) || 0) * 2 + (Number(b.share_count) || 0) * 3;
+        return scoreB - scoreA;
+      })
+      .slice(0, 10),
+    pageRanking: Array.from(pageMap.values())
+      .sort((a, b) => b.value - a.value || b.engagement - a.engagement)
+      .slice(0, 10)
+  };
+}
+
 function buildPttStats(posts, keywords) {
   const sortedByPush = posts
     .slice()
@@ -216,17 +255,20 @@ export async function handler(event) {
     const today = dateKey();
     const negativeCutoff = new Date();
     negativeCutoff.setMonth(negativeCutoff.getMonth() - 1);
+    const facebookCutoff = new Date(Date.now() - 7 * 86400000);
 
-    const [articleResult, keywordResult, postResult, negativeResult] = await Promise.all([
+    const [articleResult, keywordResult, postResult, negativeResult, facebookResult] = await Promise.all([
       supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(500),
       supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword'),
       supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000),
-      supabase.from('articles').select('*').eq('sentiment', 'negative').gte('created_at', negativeCutoff.toISOString()).order('created_at', { ascending: false }).limit(500)
+      supabase.from('articles').select('*').eq('sentiment', 'negative').gte('created_at', negativeCutoff.toISOString()).order('created_at', { ascending: false }).limit(500),
+      supabase.from('articles').select('*').eq('platform', 'facebook_page').not('post_id', 'is', null).gte('created_at', facebookCutoff.toISOString()).order('created_at', { ascending: false }).limit(500)
     ]);
     if (articleResult.error) throw articleResult.error;
     if (keywordResult.error) throw keywordResult.error;
     if (postResult.error && !['42P01', 'PGRST205'].includes(postResult.error.code)) throw postResult.error;
     if (negativeResult.error) throw negativeResult.error;
+    if (facebookResult.error) throw facebookResult.error;
 
     const keywords = (keywordResult.data || []).map((item) => item.keyword);
     const allArticles = articleResult.data || [];
@@ -240,6 +282,9 @@ export async function handler(event) {
     const negativeArticles = selectedKeyword
       ? (negativeResult.data || []).filter((item) => matchesKeyword(item, selectedKeyword))
       : negativeResult.data || [];
+    const facebookArticles = selectedKeyword
+      ? (facebookResult.data || []).filter((item) => matchesKeyword(item, selectedKeyword))
+      : facebookResult.data || [];
     const todayArticles = articles.filter((item) => dateKey(item.created_at) === today);
 
     if (params.report === 'daily') {
@@ -279,6 +324,7 @@ export async function handler(event) {
       .slice(0, 10);
     const youtubeStats = buildYouTubeStats(articles);
     const googleReviewStats = buildGoogleReviewStats(articles);
+    const facebookStats = buildFacebookStats(facebookArticles);
     const dcardStats = buildDcardStats(filteredSocialPosts.filter((item) => item.source === 'dcard'), keywords);
     const pttStats = buildPttStats(filteredSocialPosts.filter((item) => item.source === 'ptt'), keywords);
 
@@ -290,7 +336,11 @@ export async function handler(event) {
       approvedCount: articles.filter((item) => item.status === 'approved').length,
       rejectedCount: articles.filter((item) => item.status === 'rejected').length,
       broadcastedCount: articles.filter((item) => item.is_broadcasted).length,
-      facebookPostCount: articles.filter((item) => item.platform === 'facebook_page' && item.post_id).length,
+      facebookPostCount: facebookStats.count,
+      facebookVolumeTrend: facebookStats.volumeTrend,
+      facebookTopPosts: facebookStats.topPosts,
+      facebookSentimentCounts: facebookStats.sentimentCounts,
+      facebookPageRanking: facebookStats.pageRanking,
       youtubeVideoCount: youtubeStats.count,
       youtubeTopChannels: youtubeStats.channels,
       youtubeTopVideos: youtubeStats.topVideos,

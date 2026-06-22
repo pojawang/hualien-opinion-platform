@@ -274,6 +274,7 @@ export function normalizeArticle(item) {
     excerpt: cleanText(item.excerpt || item.snippet || ''),
     like_count: Number.isFinite(Number(item.like_count)) ? Math.max(0, Math.trunc(Number(item.like_count))) : 0,
     comment_count: Number.isFinite(Number(item.comment_count)) ? Math.max(0, Math.trunc(Number(item.comment_count))) : 0,
+    share_count: Number.isFinite(Number(item.share_count)) ? Math.max(0, Math.trunc(Number(item.share_count))) : 0,
     place_name: cleanText(item.place_name || '') || null,
     rating: Number.isFinite(Number(item.rating)) ? Math.min(5, Math.max(0, Number(item.rating))) : null,
     review_count: Number.isFinite(Number(item.review_count)) ? Math.max(0, Math.trunc(Number(item.review_count))) : 0,

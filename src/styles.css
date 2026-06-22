@@ -281,6 +281,33 @@ a {
   text-align: center;
 }
 
+.facebookPageForm {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.facebookPageRow {
+  align-items: center;
+  border-bottom: 1px solid #e5eeeb;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(240px, 1fr) 130px 180px auto auto;
+  padding: 12px;
+}
+
+.facebookPageRow > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.facebookPageRow a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cardList {
   display: grid;
   gap: 14px;
@@ -465,6 +492,8 @@ a {
   .statsGrid,
   .chartGrid,
   .formGrid,
+  .facebookPageForm,
+  .facebookPageRow,
   .tableRow,
   .tableRow.wide {
     grid-template-columns: 1fr;

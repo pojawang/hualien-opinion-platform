@@ -7,6 +7,7 @@ const links = [
   { to: '/articles', label: '文章審核' },
   { to: '/keywords', label: '關鍵字' },
   { to: '/sources', label: '來源' },
+  { to: '/facebook-pages', label: 'Facebook監測' },
   { to: '/reports', label: '報表' }
 ];
 
