@@ -177,7 +177,7 @@ export async function handler(event) {
     const selectedKeyword = (params.keyword || '').trim();
     const today = dateKey();
     const negativeCutoff = new Date();
-    negativeCutoff.setMonth(negativeCutoff.getMonth() - 3);
+    negativeCutoff.setMonth(negativeCutoff.getMonth() - 1);
 
     const [articleResult, keywordResult, postResult, negativeResult] = await Promise.all([
       supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(500),
