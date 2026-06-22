@@ -138,7 +138,7 @@ async function enrichPushCounts(
   fetchImpl: typeof fetch,
   timeoutMs: number
 ) {
-  const selectedRows = rows.slice(0, 30);
+  const selectedRows = rows.slice(0, 10);
   let nextIndex = 0;
 
   async function worker() {
@@ -154,7 +154,7 @@ async function enrichPushCounts(
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(3, selectedRows.length) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(5, selectedRows.length) }, () => worker()));
 }
 
 export async function collectPttPosts(options: CollectorOptions) {

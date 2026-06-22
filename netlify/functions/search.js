@@ -4,6 +4,7 @@ import {
   guard,
   json,
   normalizeArticle,
+  parseBody,
   parseXmlFeed,
   supabaseAdmin,
   upsertDefaultsIfEmpty
@@ -544,6 +545,10 @@ export async function handler(event) {
       return json(405, { error: 'Method not allowed' });
     }
 
+    const body = isScheduled ? {} : parseBody(event);
+    const requestedMode = String(body.mode || 'all');
+    const mode = ['web', 'videos', 'sources'].includes(requestedMode) ? requestedMode : 'all';
+
     const supabase = supabaseAdmin();
     await upsertDefaultsIfEmpty(supabase);
 
@@ -562,13 +567,24 @@ export async function handler(event) {
     const candidates = [];
     const errors = [];
     const tasks = [];
+    const allKeywords = keywords || [];
+    const offset = Math.max(0, Number.parseInt(body.offset, 10) || 0);
+    const limit = Math.min(5, Math.max(1, Number.parseInt(body.limit, 10) || 3));
+    const batchKeywords = mode === 'all' ? allKeywords : allKeywords.slice(offset, offset + limit);
+    const runWeb = mode === 'all' || mode === 'web';
+    const runVideos = mode === 'all' || mode === 'videos';
+    const runSources = mode === 'all' || mode === 'sources';
 
-    for (const item of keywords || []) {
-      tasks.push(
-        { source: `Serper Search ${item.keyword}`, run: () => serper('search', item.keyword) },
-        { source: `Serper News ${item.keyword}`, run: () => serper('news', `${item.keyword} 新聞`) },
-        { source: `Serper Videos ${item.keyword}`, run: () => youtubeVideos(item.keyword) }
-      );
+    for (const item of batchKeywords) {
+      if (runWeb) {
+        tasks.push(
+          { source: `Serper Search ${item.keyword}`, run: () => serper('search', item.keyword) },
+          { source: `Serper News ${item.keyword}`, run: () => serper('news', `${item.keyword} 新聞`) }
+        );
+      }
+      if (runVideos) {
+        tasks.push({ source: `Serper Videos ${item.keyword}`, run: () => youtubeVideos(item.keyword) });
+      }
     }
 
     let serperBlocked = false;
@@ -588,12 +604,14 @@ export async function handler(event) {
       }
     });
 
-    const sourcesToCollect = serperBlocked
-      ? (sources || []).filter((source) => ['rss', 'sitemap', 'website', 'dcard', 'ptt'].includes(source.source_type))
-      : sources || [];
-    const sourceResults = await collectFromSources(sourcesToCollect);
-    candidates.push(...sourceResults.results);
-    errors.push(...sourceResults.errors);
+    if (runSources) {
+      const sourcesToCollect = serperBlocked
+        ? (sources || []).filter((source) => ['rss', 'sitemap', 'website', 'dcard', 'ptt'].includes(source.source_type))
+        : sources || [];
+      const sourceResults = await collectFromSources(sourcesToCollect);
+      candidates.push(...sourceResults.results);
+      errors.push(...sourceResults.errors);
+    }
 
     try {
       await enrichYouTubeMetadata(candidates);
@@ -610,6 +628,11 @@ export async function handler(event) {
       googleReviewCandidates: candidates.filter((item) => item.platform === 'google_reviews').length,
       inserted,
       duplicates,
+      mode,
+      processedKeywords: mode === 'sources' ? 0 : batchKeywords.length,
+      totalKeywords: allKeywords.length,
+      hasMore: mode !== 'sources' && offset + batchKeywords.length < allKeywords.length,
+      serperBlocked,
       errors
     });
   } catch (err) {

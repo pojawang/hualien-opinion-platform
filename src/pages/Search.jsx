@@ -12,6 +12,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState('');
 
   async function runSearch() {
     setLoading(true);
@@ -19,13 +20,62 @@ export default function Search() {
     setResult(null);
 
     try {
-      const [searchResult, dcardResult, pttResult] = await Promise.allSettled([
-        apiFetch('search', { method: 'POST' }),
+      const combined = {
+        inserted: 0,
+        duplicates: 0,
+        total: 0,
+        youtubeCandidates: 0,
+        googleReviewCandidates: 0,
+        errors: []
+      };
+
+      function merge(data) {
+        combined.inserted += data.inserted || 0;
+        combined.duplicates += data.duplicates || 0;
+        combined.total += data.total || 0;
+        combined.youtubeCandidates += data.youtubeCandidates || 0;
+        combined.googleReviewCandidates += data.googleReviewCandidates || 0;
+        combined.errors.push(...(data.errors || []));
+      }
+
+      async function runBatches(mode, label) {
+        let offset = 0;
+        while (true) {
+          setProgress(`${label}：第 ${Math.floor(offset / 3) + 1} 批`);
+          try {
+            const data = await apiFetch('search', {
+              method: 'POST',
+              body: JSON.stringify({ mode, offset, limit: 3 })
+            });
+            merge(data);
+            if (!data.hasMore || data.serperBlocked || !data.processedKeywords) break;
+            offset += data.processedKeywords;
+          } catch (batchError) {
+            combined.errors.push({ source: label, message: batchError.message });
+            break;
+          }
+        }
+      }
+
+      await runBatches('web', 'Google Search 與 News');
+      await runBatches('videos', 'YouTube');
+
+      setProgress('RSS、Sitemap、Places 與網站來源');
+      try {
+        merge(await apiFetch('search', {
+          method: 'POST',
+          body: JSON.stringify({ mode: 'sources' })
+        }));
+      } catch (sourceError) {
+        combined.errors.push({ source: '網站來源', message: sourceError.message });
+      }
+
+      setProgress('Dcard 與 PTT');
+      const [dcardResult, pttResult] = await Promise.allSettled([
         apiFetch('collect-dcard', { method: 'POST' }),
         apiFetch('collect-ptt', { method: 'POST' })
       ]);
 
-      if (searchResult.status === 'rejected') throw searchResult.reason;
       const collectorErrors = [];
       if (dcardResult.status === 'rejected') collectorErrors.push(`Dcard：${dcardResult.reason.message}`);
       if (pttResult.status === 'rejected') collectorErrors.push(`PTT：${pttResult.reason.message}`);
@@ -36,7 +86,7 @@ export default function Search() {
         collectorErrors.push(...(pttResult.value.errors || []).map((item) => `PTT ${item.board}：${collectorErrorMessage(item.message)}`));
       }
       setResult({
-        ...searchResult.value,
+        ...combined,
         dcard: dcardResult.status === 'fulfilled' ? dcardResult.value : null,
         ptt: pttResult.status === 'fulfilled' ? pttResult.value : null,
         collectorErrors
@@ -44,6 +94,7 @@ export default function Search() {
     } catch (err) {
       setError(err.message);
     } finally {
+      setProgress('');
       setLoading(false);
     }
   }
@@ -53,10 +104,11 @@ export default function Search() {
       <header className="pageHeader">
         <div>
           <h2>搜尋蒐集</h2>
-          <p>手動執行 Serper Search、News、Videos、RSS 與 Sitemap 蒐集</p>
+          <p>分批執行 Search、News、Videos、Places、RSS、Sitemap、Dcard 與 PTT 蒐集</p>
         </div>
         <button onClick={runSearch} disabled={loading}>{loading ? '蒐集中...' : '開始搜尋'}</button>
       </header>
+      {progress && <div className="notice">目前進度：{progress}</div>}
       {error && <div className="alert">{error}</div>}
       {result && (
         <section className="panel">
