@@ -63,13 +63,45 @@ function normalizePostUrl(value = '') {
   try {
     const url = new URL(value, 'https://www.facebook.com');
     if (url.hostname === 'l.facebook.com' && url.searchParams.get('u')) return normalizePostUrl(url.searchParams.get('u'));
+    if (!/(^|\.)facebook\.com$/i.test(url.hostname)) return '';
+    url.protocol = 'https:';
+    url.hostname = 'www.facebook.com';
     url.hash = '';
     for (const key of [...url.searchParams.keys()]) {
-      if (!['story_fbid', 'id', 'fbid'].includes(key)) url.searchParams.delete(key);
+      if (!['story_fbid', 'id', 'fbid', 'v'].includes(key)) url.searchParams.delete(key);
     }
     return url.toString();
   } catch {
     return '';
+  }
+}
+
+function postLinkScore(anchor) {
+  const href = anchor.href || '';
+  if (!/(^|\.)facebook\.com\//i.test(href)) return -1;
+  if (/comment_id=|reply_comment_id=|\/comments\/?(?:\?|$)/i.test(href)) return -1;
+
+  const context = `${anchor.text} ${anchor.label} ${anchor.title}`;
+  let score = /分鐘|小時|天|日|月|週|剛剛|ago|yesterday/i.test(context) ? 120 : 0;
+  if (/story_fbid=|\/posts\//i.test(href)) score += 100;
+  else if (/\/permalink\/|\/share\/p\//i.test(href)) score += 90;
+  else if (/\/reel\/|\/videos\/|\/share\/v\//i.test(href)) score += 60;
+  else if (/\/photo(?:\.php|\/)|fbid=|\/watch\/?\?v=/i.test(href)) score += 40;
+  else return -1;
+  return score;
+}
+
+function facebookPostId(value) {
+  try {
+    const url = new URL(value);
+    return url.searchParams.get('story_fbid')
+      || url.searchParams.get('fbid')
+      || url.searchParams.get('v')
+      || url.pathname.match(/\/(?:posts|videos|reel)\/([^/?]+)/i)?.[1]
+      || url.pathname.match(/\/share\/(?:p|v)\/([^/?]+)/i)?.[1]
+      || crypto.createHash('sha1').update(value).digest('hex');
+  } catch {
+    return crypto.createHash('sha1').update(value).digest('hex');
   }
 }
 
@@ -147,19 +179,22 @@ async function scrapePage(page, configuredPage) {
         .map((node) => node.textContent?.trim() || '')
         .filter((text) => text.length > 10 && text.length < 8000)
         .sort((a, b) => b.length - a.length);
-      const anchors = [...article.querySelectorAll('a[href]')].map((anchor) => ({
+      const anchors = [...article.querySelectorAll('a[href]')].map((anchor, order) => ({
         href: anchor.href,
         text: anchor.textContent?.trim() || '',
         label: anchor.getAttribute('aria-label') || '',
-        title: anchor.getAttribute('title') || ''
+        title: anchor.getAttribute('title') || '',
+        order
       }));
-      const postLink = anchors.find((anchor) => /\/posts\/|\/permalink\/|story_fbid=|\/videos\//.test(anchor.href));
       const timeNode = article.querySelector('time[datetime], abbr[data-utime], [data-utime]');
+      const timeAnchor = timeNode?.closest('a[href]') || timeNode?.parentElement?.closest('a[href]');
+      const timeHref = timeAnchor?.href || '';
       const timeValue = timeNode?.getAttribute('datetime') || timeNode?.getAttribute('data-utime')
         || anchors.map((anchor) => `${anchor.label} ${anchor.title} ${anchor.text}`).find((text) => /分鐘|小時|天|日|月|週|剛剛|ago|yesterday/i.test(text)) || '';
       return {
         message: messageNode?.textContent?.trim() || autoTexts[0] || '',
-        postUrl: postLink?.href || '',
+        timeHref,
+        anchors,
         timeValue,
         metricsText: `${article.innerText} ${[...article.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label')).join(' ')}`
       };
@@ -167,7 +202,14 @@ async function scrapePage(page, configuredPage) {
     articleCount = Math.max(articleCount, snapshots.length);
 
     for (const snapshot of snapshots) {
-      const postUrl = normalizePostUrl(snapshot.postUrl);
+      const timeUrl = normalizePostUrl(snapshot.timeHref);
+      const rankedLink = [...snapshot.anchors]
+        .map((anchor) => ({ anchor, score: postLinkScore(anchor) }))
+        .filter((candidate) => candidate.score >= 0)
+        .sort((a, b) => b.score - a.score || a.anchor.order - b.anchor.order)[0]?.anchor.href;
+      const postUrl = postLinkScore({ href: timeUrl, text: snapshot.timeValue, label: '', title: '' }) >= 0
+        ? timeUrl
+        : normalizePostUrl(rankedLink);
       const published = parsePublishedAt(snapshot.timeValue);
       if (!postUrl || !snapshot.message || !published || published < cutoff || published > new Date()) continue;
       const likes = metricFromText(snapshot.metricsText, ['讚', 'likes?']);
@@ -185,17 +227,36 @@ async function scrapePage(page, configuredPage) {
 
 async function upsertRows(rows) {
   if (!rows.length) return 0;
-  const urls = rows.map((row) => row.url);
-  const { data: existing, error: lookupError } = await supabase.from('articles').select('*').in('url', urls);
+  const { data: existing, error: lookupError } = await supabase
+    .from('articles')
+    .select('*')
+    .eq('platform', 'facebook_page')
+    .gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString());
   if (lookupError) throw lookupError;
-  const existingMap = new Map((existing || []).map((row) => [row.url, row]));
-  const merged = rows.map((row) => {
-    const previous = existingMap.get(row.url);
-    return previous ? { ...previous, ...row, status: previous.status, is_broadcasted: previous.is_broadcasted } : row;
-  });
-  const { data, error } = await supabase.from('articles').upsert(merged, { onConflict: 'url' }).select('url');
+  const byUrl = new Map((existing || []).map((row) => [row.url, row]));
+  const byIdentity = new Map((existing || []).map((row) => [`${row.source}\n${row.title}`, row]));
+  const inserts = [];
+  let updated = 0;
+
+  for (const row of rows) {
+    const previous = byUrl.get(row.url) || byIdentity.get(`${row.source}\n${row.title}`);
+    if (!previous) {
+      inserts.push(row);
+      continue;
+    }
+    const { error } = await supabase.from('articles').update({
+      ...row,
+      status: previous.status,
+      is_broadcasted: previous.is_broadcasted
+    }).eq('id', previous.id);
+    if (error) throw error;
+    updated += 1;
+  }
+
+  if (!inserts.length) return updated;
+  const { data, error } = await supabase.from('articles').upsert(inserts, { onConflict: 'url' }).select('url');
   if (error) throw error;
-  return data?.length || 0;
+  return updated + (data?.length || 0);
 }
 
 const { data: configuredPages, error: pagesError } = await supabase.from('facebook_pages').select('*').eq('enabled', true);
@@ -216,9 +277,7 @@ try {
       const posts = await scrapePage(page, configuredPage);
       for (const post of posts) {
         const analysis = await analyzeText(post.message, { likes: post.likes, comments: post.comments, shares: post.shares });
-        const postId = post.postUrl.match(/(?:posts|videos)\/(\d+)/)?.[1]
-          || new URL(post.postUrl).searchParams.get('story_fbid')
-          || crypto.createHash('sha1').update(post.postUrl).digest('hex');
+        const postId = facebookPostId(post.postUrl);
         rows.push({
           title: post.message.split('\n')[0].slice(0, 90), url: post.postUrl,
           source: configuredPage.page_name || 'Facebook 粉專', platform: 'facebook_page',
