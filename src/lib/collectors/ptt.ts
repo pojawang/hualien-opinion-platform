@@ -108,6 +108,55 @@ async function fetchBoard(
   }
 }
 
+async function fetchPostPushCount(
+  url: string,
+  fetchImpl: typeof fetch,
+  timeoutMs: number
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'text/html',
+        Cookie: 'over18=1',
+        'User-Agent': 'Mozilla/5.0 (compatible; HualienOpinionPlatform/1.0)'
+      }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const html = await response.text();
+    return (html.match(/<div\s+class=["']push["']/gi) || []).length;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function enrichPushCounts(
+  rows: Array<Record<string, unknown>>,
+  fetchImpl: typeof fetch,
+  timeoutMs: number
+) {
+  const selectedRows = rows.slice(0, 30);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < selectedRows.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const row = selectedRows[index];
+      try {
+        row.push_count = await fetchPostPushCount(String(row.url), fetchImpl, timeoutMs);
+      } catch {
+        // Keep the board index count when an individual article cannot be read.
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(3, selectedRows.length) }, () => worker()));
+}
+
 export async function collectPttPosts(options: CollectorOptions) {
   const fetchImpl = options.fetchImpl || fetch;
   const timeoutMs = options.timeoutMs || 6000;
@@ -146,6 +195,7 @@ export async function collectPttPosts(options: CollectorOptions) {
   }
 
   const rows = Array.from(collected.values());
+  await enrichPushCounts(rows, fetchImpl, timeoutMs);
   let upserted = 0;
   for (let index = 0; index < rows.length; index += 100) {
     const chunk = rows.slice(index, index + 100);

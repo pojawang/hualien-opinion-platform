@@ -137,7 +137,11 @@ export default function Dashboard() {
             {(stats.dcardTopPosts || []).map((post) => (
               <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
                 <span>{cleanArticleText(post.title, '未命名文章')}</span>
-                <small>{numberFormat.format(Number(post.like_count) || 0)} 個讚 · {numberFormat.format(Number(post.comment_count) || 0)} 則留言</small>
+                <small>
+                  {post.like_count == null ? '按讚數未提供' : `${numberFormat.format(Number(post.like_count) || 0)} 個讚`}
+                  {' · '}
+                  {post.comment_count == null ? '留言數未提供' : `${numberFormat.format(Number(post.comment_count) || 0)} 則留言`}
+                </small>
               </a>
             ))}
           </div>
@@ -184,19 +188,6 @@ export default function Dashboard() {
           {stats.pttDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 PTT 關鍵字資料。</p>}
         </div>
       </section>
-      <section className="panel">
-        <h3>PTT 推文排行</h3>
-        <ol className="keywordRanking">
-          {(stats.pttPushRanking || []).map((post, index) => (
-            <li key={post.id}>
-              <strong>{index + 1}</strong>
-              <a href={post.url} target="_blank" rel="noreferrer">{cleanArticleText(post.title, '未命名文章')}</a>
-              <b>{numberFormat.format(Number(post.push_count) || 0)} 推</b>
-            </li>
-          ))}
-        </ol>
-        {stats.pttPushRanking?.length === 0 && <p className="emptyState">目前沒有 PTT 推文資料。</p>}
-      </section>
       <section className="chartGrid">
         <div className="panel">
           <h3>YouTube 熱門頻道排行</h3>
@@ -240,7 +231,7 @@ export default function Dashboard() {
         </div>
         <div className="panel warningPanel">
           <div className="sectionHeading">
-            <h3>負評預警</h3>
+            <h3>近三個月負評預警</h3>
             <span>{stats.negativeAlerts.length} 則</span>
           </div>
           <div className="warningList">
@@ -251,7 +242,7 @@ export default function Dashboard() {
               </a>
             ))}
           </div>
-          {stats.negativeAlerts.length === 0 && <p className="emptyState">目前沒有負面預警。</p>}
+          {stats.negativeAlerts.length === 0 && <p className="emptyState">近三個月沒有負面預警。</p>}
         </div>
       </section>
       <section className="chartGrid">

@@ -132,7 +132,6 @@ function buildPttStats(posts, keywords) {
   return {
     count: posts.length,
     topPosts: sortedByPush,
-    pushRanking: sortedByPush,
     discussionKeywords
   };
 }
@@ -144,15 +143,19 @@ export async function handler(event) {
     const params = event.queryStringParameters || {};
     const selectedKeyword = (params.keyword || '').trim();
     const today = dateKey();
+    const negativeCutoff = new Date();
+    negativeCutoff.setMonth(negativeCutoff.getMonth() - 3);
 
-    const [articleResult, keywordResult, postResult] = await Promise.all([
+    const [articleResult, keywordResult, postResult, negativeResult] = await Promise.all([
       supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(500),
       supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword'),
-      supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000)
+      supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000),
+      supabase.from('articles').select('*').eq('sentiment', 'negative').gte('created_at', negativeCutoff.toISOString()).order('created_at', { ascending: false }).limit(500)
     ]);
     if (articleResult.error) throw articleResult.error;
     if (keywordResult.error) throw keywordResult.error;
     if (postResult.error && !['42P01', 'PGRST205'].includes(postResult.error.code)) throw postResult.error;
+    if (negativeResult.error) throw negativeResult.error;
 
     const keywords = (keywordResult.data || []).map((item) => item.keyword);
     const allArticles = articleResult.data || [];
@@ -163,6 +166,9 @@ export async function handler(event) {
     const filteredSocialPosts = selectedKeyword
       ? socialPosts.filter((item) => matchesKeyword(item, selectedKeyword))
       : socialPosts;
+    const negativeArticles = selectedKeyword
+      ? (negativeResult.data || []).filter((item) => matchesKeyword(item, selectedKeyword))
+      : negativeResult.data || [];
     const todayArticles = articles.filter((item) => dateKey(item.created_at) === today);
 
     if (params.report === 'daily') {
@@ -190,10 +196,16 @@ export async function handler(event) {
       .slice(0, 10);
 
     const importanceOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-    const negativeAlerts = articles
-      .filter((item) => item.sentiment === 'negative')
+    const negativeAlerts = [...negativeArticles, ...filteredSocialPosts]
+      .filter((item) => {
+        if (item.sentiment !== 'negative') return false;
+        const publishedTime = Date.parse(item.published_at || '');
+        const createdTime = Date.parse(item.created_at || '');
+        const timestamp = Number.isNaN(publishedTime) ? createdTime : publishedTime;
+        return !Number.isNaN(timestamp) && timestamp >= negativeCutoff.getTime();
+      })
       .sort((a, b) => (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9))
-      .slice(0, 5);
+      .slice(0, 10);
     const youtubeStats = buildYouTubeStats(articles);
     const dcardStats = buildDcardStats(filteredSocialPosts.filter((item) => item.source === 'dcard'), keywords);
     const pttStats = buildPttStats(filteredSocialPosts.filter((item) => item.source === 'ptt'), keywords);
@@ -216,7 +228,6 @@ export async function handler(event) {
       pttCount: pttStats.count,
       pttTopPosts: pttStats.topPosts,
       pttDiscussionKeywords: pttStats.discussionKeywords,
-      pttPushRanking: pttStats.pushRanking,
       categoryCounts: countBy(articles, 'category'),
       sourceCounts: countBy(articles, 'platform', 'website')
         .sort((a, b) => b.value - a.value),

@@ -152,8 +152,8 @@ function toPostRow(post: DcardPost, forumAlias: string) {
     source_name: post.forumName || post.forumAlias || forumAlias,
     external_id: externalId,
     published_at: post.createdAt || null,
-    like_count: Number(post.likeCount) || 0,
-    comment_count: Number(post.commentCount) || 0,
+    like_count: post.url ? null : Number(post.likeCount) || 0,
+    comment_count: post.url ? null : Number(post.commentCount) || 0,
     share_count: Number(post.shareCount) || 0,
     sentiment: sentimentOf(text),
     raw_data: post
