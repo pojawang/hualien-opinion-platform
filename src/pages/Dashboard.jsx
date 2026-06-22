@@ -182,6 +182,36 @@ export default function Dashboard() {
       </section>
       <section className="chartGrid">
         <div className="panel">
+          <h3>熱門關鍵字排行榜</h3>
+          <PagedItems items={stats.popularKeywords} className="keywordRanking" ordered>
+            {(item, index, globalIndex) => (
+              <li key={item.name}>
+                <strong>{globalIndex + 1}</strong>
+                <span>{item.name}</span>
+                <b>{item.value} 則</b>
+              </li>
+            )}
+          </PagedItems>
+          {stats.popularKeywords.length === 0 && <p className="emptyState">目前沒有關鍵字聲量。</p>}
+        </div>
+        <div className="panel warningPanel">
+          <div className="sectionHeading">
+            <h3>近一個月負評預警</h3>
+            <span>{stats.negativeAlerts.length} 則</span>
+          </div>
+          <PagedItems items={stats.negativeAlerts} className="warningList">
+            {(article) => (
+              <a key={article.id} href={article.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(article.title, '未命名文章')}</span>
+                <small>{article.category || '其他'} · 重要程度：{importanceLabel(article.importance)}</small>
+              </a>
+            )}
+          </PagedItems>
+          {stats.negativeAlerts.length === 0 && <p className="emptyState">近一個月沒有負面預警。</p>}
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
           <h3>Facebook 聲量趨勢</h3>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={stats.facebookVolumeTrend || []}>
@@ -235,36 +265,6 @@ export default function Dashboard() {
             )}
           </PagedItems>
           {stats.facebookPageRanking?.length === 0 && <p className="emptyState">目前沒有 Facebook 粉專資料。</p>}
-        </div>
-      </section>
-      <section className="chartGrid">
-        <div className="panel">
-          <h3>熱門關鍵字排行榜</h3>
-          <PagedItems items={stats.popularKeywords} className="keywordRanking" ordered>
-            {(item, index, globalIndex) => (
-              <li key={item.name}>
-                <strong>{globalIndex + 1}</strong>
-                <span>{item.name}</span>
-                <b>{item.value} 則</b>
-              </li>
-            )}
-          </PagedItems>
-          {stats.popularKeywords.length === 0 && <p className="emptyState">目前沒有關鍵字聲量。</p>}
-        </div>
-        <div className="panel warningPanel">
-          <div className="sectionHeading">
-            <h3>近一個月負評預警</h3>
-            <span>{stats.negativeAlerts.length} 則</span>
-          </div>
-          <PagedItems items={stats.negativeAlerts} className="warningList">
-            {(article) => (
-              <a key={article.id} href={article.url} target="_blank" rel="noreferrer">
-                <span>{cleanArticleText(article.title, '未命名文章')}</span>
-                <small>{article.category || '其他'} · 重要程度：{importanceLabel(article.importance)}</small>
-              </a>
-            )}
-          </PagedItems>
-          {stats.negativeAlerts.length === 0 && <p className="emptyState">近一個月沒有負面預警。</p>}
         </div>
       </section>
       <section className="chartGrid">
