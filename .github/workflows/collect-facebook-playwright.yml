@@ -1,8 +1,6 @@
 name: Facebook Playwright Collector
 
 on:
-  schedule:
-    - cron: '15 22 * * *'
   workflow_dispatch:
 
 permissions:

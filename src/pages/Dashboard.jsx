@@ -27,6 +27,28 @@ import {
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
 const numberFormat = new Intl.NumberFormat('zh-TW');
 const PAGE_SIZE = 5;
+const sectionOptions = [
+  ['overview', '狀態總覽'],
+  ['summary', 'AI 每日摘要'],
+  ['trend', '聲量與情緒'],
+  ['keywords', '關鍵字與負評'],
+  ['facebook', 'Facebook 分析'],
+  ['dcard', 'Dcard 分析'],
+  ['ptt', 'PTT 分析'],
+  ['youtube', 'YouTube 分析'],
+  ['reviews', 'Google 評論'],
+  ['distribution', '分類與來源'],
+  ['latest', '最新文章']
+];
+const defaultVisibleSections = Object.fromEntries(sectionOptions.map(([key]) => [key, true]));
+
+function initialVisibleSections() {
+  try {
+    return { ...defaultVisibleSections, ...JSON.parse(localStorage.getItem('dashboard_visible_sections') || '{}') };
+  } catch {
+    return defaultVisibleSections;
+  }
+}
 
 function PagedItems({ items = [], className, ordered = false, children }) {
   const [page, setPage] = useState(0);
@@ -80,6 +102,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [selectedKeyword, setSelectedKeyword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [visibleSections, setVisibleSections] = useState(initialVisibleSections);
 
   async function load(keyword = selectedKeyword) {
     try {
@@ -97,6 +120,14 @@ export default function Dashboard() {
   useEffect(() => {
     load();
   }, []);
+
+  function toggleSection(key) {
+    setVisibleSections((current) => {
+      const next = { ...current, [key]: !current[key] };
+      localStorage.setItem('dashboard_visible_sections', JSON.stringify(next));
+      return next;
+    });
+  }
 
   if (error) return <div className="alert">{error}</div>;
   if (!stats) return <div className="panel">載入中...</div>;
@@ -131,7 +162,24 @@ export default function Dashboard() {
           </select>
         </label>
       </header>
-      <section className="statsGrid">
+      <section className="panel dashboardDisplayControls">
+        <div className="sectionHeading">
+          <h3>儀表板顯示項目</h3>
+          <button type="button" className="secondaryButton" onClick={() => {
+            setVisibleSections(defaultVisibleSections);
+            localStorage.setItem('dashboard_visible_sections', JSON.stringify(defaultVisibleSections));
+          }}>全部顯示</button>
+        </div>
+        <div className="dashboardCheckboxes">
+          {sectionOptions.map(([key, label]) => (
+            <label key={key}>
+              <input type="checkbox" checked={visibleSections[key]} onChange={() => toggleSection(key)} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+      </section>
+      <section className="statsGrid" hidden={!visibleSections.overview}>
         <StatCard label="今日新增" value={stats.todayCount} />
         <StatCard label="待審核" value={stats.pendingCount} />
         <StatCard label="已核准" value={stats.approvedCount} />
@@ -143,7 +191,7 @@ export default function Dashboard() {
         <StatCard label="PTT 聲量" value={stats.pttCount || 0} />
         <StatCard label="Google 評論地點" value={stats.googleReviewPlaceCount || 0} />
       </section>
-      <section className="panel summaryPanel">
+      <section className="panel summaryPanel" hidden={!visibleSections.summary}>
         <div className="sectionHeading">
           <div>
             <h3>AI 每日摘要</h3>
@@ -152,7 +200,7 @@ export default function Dashboard() {
         </div>
         <p>{stats.dailySummary}</p>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.trend}>
         <div className="panel">
           <h3>聲量趨勢</h3>
           <ResponsiveContainer width="100%" height={260}>
@@ -180,7 +228,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.keywords}>
         <div className="panel">
           <h3>熱門關鍵字排行榜</h3>
           <PagedItems items={stats.popularKeywords} className="keywordRanking" ordered>
@@ -210,7 +258,7 @@ export default function Dashboard() {
           {stats.negativeAlerts.length === 0 && <p className="emptyState">近一個月沒有負面預警。</p>}
         </div>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.facebook}>
         <div className="panel">
           <h3>Facebook 聲量趨勢</h3>
           <ResponsiveContainer width="100%" height={260}>
@@ -236,7 +284,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.facebook}>
         <div className="panel">
           <h3>Facebook 熱門貼文 TOP 10</h3>
           <PagedItems items={stats.facebookTopPosts || []} className="warningList">
@@ -267,7 +315,7 @@ export default function Dashboard() {
           {stats.facebookPageRanking?.length === 0 && <p className="emptyState">目前沒有 Facebook 粉專資料。</p>}
         </div>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.dcard}>
         <div className="panel">
           <h3>Dcard 熱門文章排行</h3>
           <PagedItems items={stats.dcardTopPosts || []} className="warningList">
@@ -298,7 +346,7 @@ export default function Dashboard() {
           {stats.dcardDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 Dcard 關鍵字資料。</p>}
         </div>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.ptt}>
         <div className="panel">
           <h3>PTT 熱門文章</h3>
           <PagedItems items={stats.pttTopPosts || []} className="warningList">
@@ -325,7 +373,7 @@ export default function Dashboard() {
           {stats.pttDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 PTT 關鍵字資料。</p>}
         </div>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.youtube}>
         <div className="panel">
           <h3>YouTube 熱門頻道排行</h3>
           <PagedItems items={stats.youtubeTopChannels || []} className="keywordRanking" ordered>
@@ -352,7 +400,7 @@ export default function Dashboard() {
           {stats.youtubeTopVideos?.length === 0 && <p className="emptyState">目前沒有 YouTube 觀看數資料。</p>}
         </div>
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.reviews}>
         <ReviewRanking
           title="評價分數排行"
           items={stats.googleReviewRatingRanking}
@@ -364,7 +412,7 @@ export default function Dashboard() {
           emptyText="目前沒有 Google 負評資料。"
         />
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.reviews}>
         <ReviewRanking
           title="景點口碑排行"
           items={stats.googleReviewAttractionRanking}
@@ -376,14 +424,14 @@ export default function Dashboard() {
           emptyText="目前沒有住宿口碑資料。"
         />
       </section>
-      <section>
+      <section hidden={!visibleSections.reviews}>
         <ReviewRanking
           title="餐廳口碑排行"
           items={stats.googleReviewRestaurantRanking}
           emptyText="目前沒有餐廳口碑資料。"
         />
       </section>
-      <section className="chartGrid">
+      <section className="chartGrid" hidden={!visibleSections.distribution}>
         <div className="panel">
           <h3>分類數量</h3>
           <ResponsiveContainer width="100%" height={260}>
@@ -409,7 +457,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </section>
-      <section className="panel">
+      <section className="panel" hidden={!visibleSections.latest}>
         <h3>{selectedKeyword ? `「${selectedKeyword}」最新文章` : '最新 10 筆文章'}</h3>
         <div className="cardList">
           {stats.latestArticles.map((article) => (

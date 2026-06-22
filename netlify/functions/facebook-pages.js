@@ -42,7 +42,7 @@ export async function handler(event) {
       const { data, error } = await supabase.from('facebook_pages').insert({
         page_name: initialName(pageUrl),
         page_url: pageUrl,
-        category: '其他',
+        category: '全部',
         enabled: true
       }).select('*').single();
       if (error) throw error;

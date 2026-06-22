@@ -36,6 +36,10 @@ button:disabled {
   opacity: 0.7;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 input,
 select {
   background: #fff;
@@ -177,6 +181,39 @@ a {
   display: grid;
   gap: 20px;
   grid-template-columns: 1.4fr 1fr;
+}
+
+.dashboardDisplayControls {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboardDisplayControls .secondaryButton {
+  background: #fff;
+  color: #0f766e;
+  min-height: 34px;
+}
+
+.dashboardCheckboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+.dashboardCheckboxes label {
+  align-items: center;
+  color: #384743;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 7px;
+  min-height: 32px;
+}
+
+.dashboardCheckboxes input {
+  accent-color: #0f766e;
+  min-height: auto;
+  width: 18px;
+  height: 18px;
 }
 
 .summaryPanel {

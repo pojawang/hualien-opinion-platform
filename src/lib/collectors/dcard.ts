@@ -139,6 +139,59 @@ async function fetchSerperPosts(
   }
 }
 
+async function fetchPostDetail(
+  post: DcardPost,
+  fetchImpl: typeof fetch,
+  timeoutMs: number
+): Promise<DcardPost> {
+  if (!post.id) return post;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(`https://www.dcard.tw/service/api/v2/posts/${post.id}`, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'zh-TW,zh;q=0.9',
+        Referer: post.url || 'https://www.dcard.tw/',
+        'User-Agent': 'Mozilla/5.0 (compatible; HualienOpinionPlatform/1.0)'
+      }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const detail = await response.json();
+    return {
+      ...post,
+      ...detail,
+      id: post.id,
+      url: post.url,
+      forumAlias: detail.forumAlias || post.forumAlias,
+      forumName: detail.forumName || post.forumName
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function enrichPostDetails(posts: DcardPost[], fetchImpl: typeof fetch, timeoutMs: number) {
+  const enriched: DcardPost[] = [];
+  let failed = 0;
+  for (let index = 0; index < posts.length; index += 3) {
+    const results = await Promise.allSettled(
+      posts.slice(index, index + 3).map((post) => fetchPostDetail(post, fetchImpl, timeoutMs))
+    );
+    results.forEach((result, offset) => {
+      if (result.status === 'fulfilled') enriched.push(result.value);
+      else {
+        enriched.push(posts[index + offset]);
+        failed += 1;
+      }
+    });
+    if (index + 3 < posts.length) await delay(350);
+  }
+  return { posts: enriched, failed };
+}
+
 function toPostRow(post: DcardPost, forumAlias: string) {
   const externalId = String(post.id || '');
   const content = post.excerpt || post.content || '';
@@ -152,9 +205,9 @@ function toPostRow(post: DcardPost, forumAlias: string) {
     source_name: post.forumName || post.forumAlias || forumAlias,
     external_id: externalId,
     published_at: post.createdAt || null,
-    like_count: post.url ? null : Number(post.likeCount) || 0,
-    comment_count: post.url ? null : Number(post.commentCount) || 0,
-    share_count: Number(post.shareCount) || 0,
+    like_count: post.likeCount == null ? null : Number(post.likeCount) || 0,
+    comment_count: post.commentCount == null ? null : Number(post.commentCount) || 0,
+    share_count: post.shareCount == null ? null : Number(post.shareCount) || 0,
     sentiment: sentimentOf(text),
     raw_data: post
   };
@@ -182,12 +235,16 @@ export async function collectDcardPosts(options: CollectorOptions) {
     } catch (error: any) {
       if (String(error?.message).includes('HTTP 403') && options.serperApiKey) {
         try {
-          const posts = await fetchSerperPosts(options.serperApiKey, fetchImpl, timeoutMs);
-          scanned += posts.length;
-          for (const post of posts) {
+          const fallbackPosts = await fetchSerperPosts(options.serperApiKey, fetchImpl, timeoutMs);
+          const detailResult = await enrichPostDetails(fallbackPosts, fetchImpl, timeoutMs);
+          scanned += detailResult.posts.length;
+          for (const post of detailResult.posts) {
             if (!post.id || !matchesHualien(post)) continue;
             const row = toPostRow(post, post.forumAlias || forum);
             collected.set(row.external_id, row);
+          }
+          if (detailResult.failed > 0) {
+            errors.push({ forum: 'detail', message: `${detailResult.failed} 篇文章無法取得即時互動數` });
           }
           fallback = 'serper';
         } catch (fallbackError: any) {

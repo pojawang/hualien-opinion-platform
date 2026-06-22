@@ -281,7 +281,7 @@ try {
         rows.push({
           title: post.message.split('\n')[0].slice(0, 90), url: post.postUrl,
           source: configuredPage.page_name || 'Facebook 粉專', platform: 'facebook_page',
-          category: configuredPage.category !== '其他' ? configuredPage.category : analysis.category,
+          category: !['全部', '其他'].includes(configuredPage.category) ? configuredPage.category : analysis.category,
           snippet: post.message, summary: post.message, post_id: postId,
           like_count: post.likes, comment_count: post.comments, share_count: post.shares,
           published_at: post.published.toISOString(), sentiment: analysis.sentiment,

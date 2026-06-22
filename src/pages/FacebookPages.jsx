@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/supabase.js';
 
-const categories = ['其他', '觀光', '美食', '住宿', '交通', '活動', '災害', '政策'];
+const categories = ['全部', '其他', '觀光', '美食', '住宿', '交通', '活動', '災害', '政策'];
 
 export default function FacebookPages() {
   const [pages, setPages] = useState([]);
   const [pageUrl, setPageUrl] = useState('');
+  const [collecting, setCollecting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -56,6 +57,20 @@ export default function FacebookPages() {
     }
   }
 
+  async function collectNow() {
+    setCollecting(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await apiFetch('trigger-facebook-collector', { method: 'POST' });
+      setMessage(result.message || 'Facebook 巡查已啟動。');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCollecting(false);
+    }
+  }
+
   return (
     <div className="pageStack">
       <header className="pageHeader">
@@ -63,7 +78,9 @@ export default function FacebookPages() {
           <h2>Facebook 監測來源</h2>
           <p>管理公開粉專並蒐集最近 7 日貼文</p>
         </div>
-        <span className="scheduleStatus">每日 06:15 自動巡查</span>
+        <button type="button" onClick={collectNow} disabled={collecting}>
+          {collecting ? '啟動中...' : '開始巡查'}
+        </button>
       </header>
       {error && <div className="alert">{error}</div>}
       {message && <div className="notice">{message}</div>}
@@ -84,7 +101,7 @@ export default function FacebookPages() {
               <strong>{page.page_name || 'Facebook 粉專'}</strong>
               <a href={page.page_url} target="_blank" rel="noreferrer">{page.page_url}</a>
             </div>
-            <select value={page.category || '其他'} onChange={(event) => patch(page.id, { category: event.target.value })}>
+            <select value={page.category || '全部'} onChange={(event) => patch(page.id, { category: event.target.value })}>
               {categories.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
             <span>{page.last_fetch_at ? new Date(page.last_fetch_at).toLocaleString('zh-TW') : '尚未巡查'}</span>
