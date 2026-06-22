@@ -66,6 +66,7 @@ export default function Search() {
             <span>重複略過：<strong>{result.duplicates}</strong></span>
             <span>候選資料：<strong>{result.total}</strong></span>
             <span>YouTube 候選：<strong>{result.youtubeCandidates || 0}</strong></span>
+            <span>Google 評論候選：<strong>{result.googleReviewCandidates || 0}</strong></span>
             <span>Dcard 新增或更新：<strong>{result.dcard?.upserted || 0}</strong></span>
             <span>PTT 新增或更新：<strong>{result.ptt?.upserted || 0}</strong></span>
           </div>

@@ -148,6 +148,25 @@ function buildDcardStats(posts, keywords) {
   };
 }
 
+function buildGoogleReviewStats(articles) {
+  const places = articles.filter((item) => item.platform === 'google_reviews' && Number(item.rating) > 0);
+  const byReputation = (items) => items
+    .slice()
+    .sort((a, b) => Number(b.rating) - Number(a.rating) || (Number(b.review_count) || 0) - (Number(a.review_count) || 0))
+    .slice(0, 10);
+
+  return {
+    count: places.length,
+    ratingRanking: byReputation(places),
+    negativeRanking: places
+      .sort((a, b) => Number(a.rating) - Number(b.rating) || (Number(b.review_count) || 0) - (Number(a.review_count) || 0))
+      .slice(0, 10),
+    attractionRanking: byReputation(places.filter((item) => item.category === '觀光')),
+    lodgingRanking: byReputation(places.filter((item) => item.category === '住宿')),
+    restaurantRanking: byReputation(places.filter((item) => item.category === '美食'))
+  };
+}
+
 function buildPttStats(posts, keywords) {
   const sortedByPush = posts
     .slice()
@@ -240,6 +259,7 @@ export async function handler(event) {
       .sort((a, b) => (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9))
       .slice(0, 10);
     const youtubeStats = buildYouTubeStats(articles);
+    const googleReviewStats = buildGoogleReviewStats(articles);
     const dcardStats = buildDcardStats(filteredSocialPosts.filter((item) => item.source === 'dcard'), keywords);
     const pttStats = buildPttStats(filteredSocialPosts.filter((item) => item.source === 'ptt'), keywords);
 
@@ -255,6 +275,12 @@ export async function handler(event) {
       youtubeVideoCount: youtubeStats.count,
       youtubeTopChannels: youtubeStats.channels,
       youtubeTopVideos: youtubeStats.topVideos,
+      googleReviewPlaceCount: googleReviewStats.count,
+      googleReviewRatingRanking: googleReviewStats.ratingRanking,
+      googleReviewNegativeRanking: googleReviewStats.negativeRanking,
+      googleReviewAttractionRanking: googleReviewStats.attractionRanking,
+      googleReviewLodgingRanking: googleReviewStats.lodgingRanking,
+      googleReviewRestaurantRanking: googleReviewStats.restaurantRanking,
       dcardCount: dcardStats.count,
       dcardTopPosts: dcardStats.topPosts,
       dcardDiscussionKeywords: dcardStats.discussionKeywords,

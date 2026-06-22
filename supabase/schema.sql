@@ -54,6 +54,11 @@ create table if not exists articles (
   excerpt text,
   like_count integer default 0,
   comment_count integer default 0,
+  place_name text,
+  rating numeric(3, 2),
+  review_count integer default 0,
+  review_text text,
+  place_type text,
   published_at text,
   sentiment text check (sentiment in ('positive', 'neutral', 'negative')),
   importance text check (importance in ('low', 'medium', 'high', 'urgent')),
@@ -98,6 +103,7 @@ create index if not exists idx_articles_post_id on articles(post_id) where post_
 create index if not exists idx_articles_channel_name on articles(channel_name) where channel_name is not null;
 create index if not exists idx_articles_view_count on articles(view_count desc) where platform = 'youtube';
 create index if not exists idx_articles_dcard_engagement on articles((like_count + comment_count) desc) where platform = 'dcard';
+create index if not exists idx_articles_google_reviews_rating on articles(rating desc) where platform = 'google_reviews';
 create index if not exists idx_posts_source on posts(source);
 create index if not exists idx_posts_published_at on posts(published_at desc);
 create index if not exists idx_posts_engagement on posts((like_count + comment_count) desc) where source = 'dcard';

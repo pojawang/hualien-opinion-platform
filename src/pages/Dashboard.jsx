@@ -27,6 +27,26 @@ import {
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
 const numberFormat = new Intl.NumberFormat('zh-TW');
 
+function ReviewRanking({ title, items = [], emptyText }) {
+  return (
+    <div className="panel">
+      <h3>{title}</h3>
+      <div className="warningList">
+        {items.map((place) => (
+          <a key={place.id} href={place.url} target="_blank" rel="noreferrer">
+            <span>{cleanArticleText(place.place_name || place.title, '未命名地點')}</span>
+            <small>
+              {Number(place.rating).toFixed(1)} 分 · {numberFormat.format(Number(place.review_count) || 0)} 則評論
+              {place.review_text ? ` · ${cleanArticleText(place.review_text)}` : ''}
+            </small>
+          </a>
+        ))}
+      </div>
+      {items.length === 0 && <p className="emptyState">{emptyText}</p>}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
@@ -92,6 +112,7 @@ export default function Dashboard() {
         <StatCard label="YouTube 影片" value={stats.youtubeVideoCount || 0} />
         <StatCard label="Dcard 聲量" value={stats.dcardCount || 0} />
         <StatCard label="PTT 聲量" value={stats.pttCount || 0} />
+        <StatCard label="Google 評論地點" value={stats.googleReviewPlaceCount || 0} />
       </section>
       <section className="panel summaryPanel">
         <div className="sectionHeading">
@@ -159,6 +180,37 @@ export default function Dashboard() {
           </div>
           {stats.negativeAlerts.length === 0 && <p className="emptyState">近一個月沒有負面預警。</p>}
         </div>
+      </section>
+      <section className="chartGrid">
+        <ReviewRanking
+          title="評價分數排行"
+          items={stats.googleReviewRatingRanking}
+          emptyText="目前沒有 Google 評論評分資料。"
+        />
+        <ReviewRanking
+          title="負評排行"
+          items={stats.googleReviewNegativeRanking}
+          emptyText="目前沒有 Google 負評資料。"
+        />
+      </section>
+      <section className="chartGrid">
+        <ReviewRanking
+          title="景點口碑排行"
+          items={stats.googleReviewAttractionRanking}
+          emptyText="目前沒有景點口碑資料。"
+        />
+        <ReviewRanking
+          title="住宿口碑排行"
+          items={stats.googleReviewLodgingRanking}
+          emptyText="目前沒有住宿口碑資料。"
+        />
+      </section>
+      <section>
+        <ReviewRanking
+          title="餐廳口碑排行"
+          items={stats.googleReviewRestaurantRanking}
+          emptyText="目前沒有餐廳口碑資料。"
+        />
       </section>
       <section className="chartGrid">
         <div className="panel">

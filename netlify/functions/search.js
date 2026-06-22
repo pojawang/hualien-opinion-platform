@@ -13,6 +13,26 @@ function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function placeCategory(value = '') {
+  const text = String(value).toLowerCase();
+  if (/(hotel|lodging|hostel|motel|民宿|飯店|旅館|住宿)/i.test(text)) return '住宿';
+  if (/(restaurant|food|cafe|bakery|餐廳|小吃|咖啡|美食|夜市)/i.test(text)) return '美食';
+  if (/(attraction|tourist|park|museum|景點|公園|步道|遊樂|觀光)/i.test(text)) return '觀光';
+  return '其他';
+}
+
+function placeReviewText(item) {
+  if (item.reviewText || item.snippet || item.description) {
+    return item.reviewText || item.snippet || item.description;
+  }
+  if (!Array.isArray(item.reviews)) return '';
+  return item.reviews
+    .map((review) => review?.text || review?.snippet || review?.reviewText || '')
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(' ');
+}
+
 async function serper(endpoint, query) {
   if (!process.env.SERPER_API_KEY) return [];
 
@@ -44,7 +64,40 @@ async function serper(endpoint, query) {
     ? data.news || []
     : endpoint === 'videos'
       ? data.videos || []
+      : endpoint === 'places'
+        ? data.places || []
       : data.organic || [];
+
+  if (endpoint === 'places') {
+    return items.map((item) => {
+      const placeName = item.title || item.name || 'Google 地點';
+      const rating = Number(item.rating);
+      const reviewText = placeReviewText(item);
+      const placeType = item.category || item.type || item.types?.join(' ') || '';
+      const cid = item.cid || item.placeId || item.place_id || '';
+      const url = item.link
+        || item.mapsUrl
+        || (cid ? `https://www.google.com/maps?cid=${encodeURIComponent(cid)}` : '')
+        || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${placeName} 花蓮`)}`;
+      return {
+        title: placeName,
+        url,
+        source: 'Google 評論',
+        platform: 'google_reviews',
+        category: placeCategory(`${placeType} ${placeName}`),
+        snippet: reviewText || item.address || placeType,
+        summary: reviewText || item.address || placeType,
+        sentiment: Number.isFinite(rating) ? (rating < 3.5 ? 'negative' : rating >= 4.2 ? 'positive' : 'neutral') : 'neutral',
+        importance: 'medium',
+        place_name: placeName,
+        rating: Number.isFinite(rating) ? rating : null,
+        review_count: Number(item.ratingCount ?? item.reviewsCount ?? item.reviewCount ?? item.userRatingCount) || 0,
+        review_text: reviewText,
+        place_type: placeType,
+        published_at: ''
+      };
+    }).filter((item) => item.url);
+  }
 
   if (endpoint === 'videos') {
     return items.map((item) => ({
@@ -344,7 +397,13 @@ async function collectApiSource(source) {
     case 'facebook_group':
       return tagSource(await serper('search', sourceQuery(source, 'site:facebook.com/groups')), source);
     case 'google_reviews':
-      return tagSource(await serper('search', `${sourceQuery(source)} Google 評論`), source);
+      {
+        const results = [];
+        for (const query of ['花蓮 景點', '花蓮 住宿', '花蓮 餐廳']) {
+          results.push(...await serper('places', query));
+        }
+        return tagSource(results, source);
+      }
     case 'ptt':
     case 'dcard':
       return [];
@@ -432,6 +491,22 @@ async function insertArticles(supabase, candidates) {
           channel_name: article.channel_name || existing.channel_name,
           view_count: article.view_count || existing.view_count || 0,
           thumbnail: article.thumbnail || existing.thumbnail
+        });
+      } else if (article.platform === 'google_reviews') {
+        rowsToUpdate.push({
+          ...existing,
+          title: article.title || existing.title,
+          source: article.source || existing.source,
+          platform: 'google_reviews',
+          category: article.category || existing.category,
+          snippet: article.snippet || existing.snippet,
+          summary: article.summary || existing.summary,
+          sentiment: article.sentiment || existing.sentiment,
+          place_name: article.place_name || existing.place_name,
+          rating: article.rating ?? existing.rating,
+          review_count: article.review_count ?? existing.review_count ?? 0,
+          review_text: article.review_text || existing.review_text,
+          place_type: article.place_type || existing.place_type
         });
       }
     }
@@ -532,6 +607,7 @@ export async function handler(event) {
       ok: true,
       total: candidates.length,
       youtubeCandidates: candidates.filter((item) => item.platform === 'youtube').length,
+      googleReviewCandidates: candidates.filter((item) => item.platform === 'google_reviews').length,
       inserted,
       duplicates,
       errors

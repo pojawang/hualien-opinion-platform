@@ -79,7 +79,11 @@ async function testSource(body) {
       ok: true,
       count: 0,
       sample: [],
-      message: sourceType === 'youtube' ? 'Serper Videos 設定完成' : 'Serper 公開搜尋設定完成'
+      message: sourceType === 'youtube'
+        ? 'Serper Videos 設定完成'
+        : sourceType === 'google_reviews'
+          ? 'Serper Places 設定完成'
+          : 'Serper 公開搜尋設定完成'
     }
   };
 }
