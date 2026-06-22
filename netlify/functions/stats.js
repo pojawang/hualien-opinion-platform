@@ -149,17 +149,33 @@ function buildDcardStats(posts, keywords) {
 }
 
 function buildGoogleReviewStats(articles) {
-  const places = articles.filter((item) => item.platform === 'google_reviews' && Number(item.rating) > 0);
+  const positiveWords = ['推薦', '好吃', '好玩', '乾淨', '親切', '舒適', '漂亮', '值得', '方便', '滿意'];
+  const negativeWords = ['失望', '很差', '糟', '爛', '髒', '貴', '難吃', '態度差', '不推薦', '踩雷', '問題'];
+  const places = articles
+    .filter((item) => item.platform === 'google_reviews' && Number(item.rating) > 0)
+    .map((item) => {
+      const text = String(item.review_text || item.snippet || '');
+      const positiveCount = positiveWords.filter((word) => text.includes(word)).length;
+      const negativeCount = negativeWords.filter((word) => text.includes(word)).length;
+      const signalTotal = positiveCount + negativeCount;
+      const contentSignal = signalTotal > 0 ? (positiveCount - negativeCount) / signalTotal : 0;
+      const rating = Number(item.rating);
+      const reviewCount = Math.max(0, Number(item.review_count) || 0);
+      const weightedRating = (rating * reviewCount + 4 * 20) / (reviewCount + 20);
+      const reputationScore = Math.max(0, Math.min(5, weightedRating + contentSignal * 0.25));
+      return { ...item, reputation_score: Number(reputationScore.toFixed(2)), review_content_signal: contentSignal };
+    });
   const byReputation = (items) => items
     .slice()
-    .sort((a, b) => Number(b.rating) - Number(a.rating) || (Number(b.review_count) || 0) - (Number(a.review_count) || 0))
+    .sort((a, b) => Number(b.reputation_score) - Number(a.reputation_score) || Number(b.rating) - Number(a.rating) || (Number(b.review_count) || 0) - (Number(a.review_count) || 0))
     .slice(0, 10);
 
   return {
     count: places.length,
     ratingRanking: byReputation(places),
     negativeRanking: places
-      .sort((a, b) => Number(a.rating) - Number(b.rating) || (Number(b.review_count) || 0) - (Number(a.review_count) || 0))
+      .slice()
+      .sort((a, b) => Number(a.reputation_score) - Number(b.reputation_score) || Number(a.rating) - Number(b.rating) || (Number(b.review_count) || 0) - (Number(a.review_count) || 0))
       .slice(0, 10),
     attractionRanking: byReputation(places.filter((item) => item.category === '觀光')),
     lodgingRanking: byReputation(places.filter((item) => item.category === '住宿')),
@@ -295,7 +311,7 @@ export async function handler(event) {
       popularKeywords,
       negativeAlerts,
       dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords),
-      latestArticles: articles.slice(0, 10)
+      latestArticles: articles.filter((item) => item.platform !== 'google_reviews').slice(0, 10)
     });
   } catch (err) {
     const status = err.message === '尚未登入' ? 401 : 500;

@@ -26,22 +26,50 @@ import {
 
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
 const numberFormat = new Intl.NumberFormat('zh-TW');
+const PAGE_SIZE = 5;
+
+function PagedItems({ items = [], className, ordered = false, children }) {
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageItems = items.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  const ListTag = ordered ? 'ol' : 'div';
+
+  useEffect(() => {
+    setPage(0);
+  }, [items]);
+
+  return (
+    <>
+      <ListTag className={className}>
+        {pageItems.map((item, index) => children(item, index, safePage * PAGE_SIZE + index))}
+      </ListTag>
+      {pageCount > 1 && (
+        <div className="paginationControls">
+          <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={safePage === 0}>上一頁</button>
+          <span>{safePage + 1} / {pageCount}</span>
+          <button type="button" onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))} disabled={safePage === pageCount - 1}>下一頁</button>
+        </div>
+      )}
+    </>
+  );
+}
 
 function ReviewRanking({ title, items = [], emptyText }) {
   return (
     <div className="panel">
       <h3>{title}</h3>
-      <div className="warningList">
-        {items.map((place) => (
+      <PagedItems items={items} className="warningList">
+        {(place) => (
           <a key={place.id} href={place.url} target="_blank" rel="noreferrer">
             <span>{cleanArticleText(place.place_name || place.title, '未命名地點')}</span>
             <small>
-              {Number(place.rating).toFixed(1)} 分 · {numberFormat.format(Number(place.review_count) || 0)} 則評論
+              評分 {Number(place.rating).toFixed(1)} · 口碑 {Number(place.reputation_score || place.rating).toFixed(2)} · {numberFormat.format(Number(place.review_count) || 0)} 則評論
               {place.review_text ? ` · ${cleanArticleText(place.review_text)}` : ''}
             </small>
           </a>
-        ))}
-      </div>
+        )}
+      </PagedItems>
       {items.length === 0 && <p className="emptyState">{emptyText}</p>}
     </div>
   );
@@ -154,15 +182,15 @@ export default function Dashboard() {
       <section className="chartGrid">
         <div className="panel">
           <h3>熱門關鍵字排行榜</h3>
-          <ol className="keywordRanking">
-            {stats.popularKeywords.map((item, index) => (
+          <PagedItems items={stats.popularKeywords} className="keywordRanking" ordered>
+            {(item, index, globalIndex) => (
               <li key={item.name}>
-                <strong>{index + 1}</strong>
+                <strong>{globalIndex + 1}</strong>
                 <span>{item.name}</span>
                 <b>{item.value} 則</b>
               </li>
-            ))}
-          </ol>
+            )}
+          </PagedItems>
           {stats.popularKeywords.length === 0 && <p className="emptyState">目前沒有關鍵字聲量。</p>}
         </div>
         <div className="panel warningPanel">
@@ -170,15 +198,100 @@ export default function Dashboard() {
             <h3>近一個月負評預警</h3>
             <span>{stats.negativeAlerts.length} 則</span>
           </div>
-          <div className="warningList">
-            {stats.negativeAlerts.map((article) => (
+          <PagedItems items={stats.negativeAlerts} className="warningList">
+            {(article) => (
               <a key={article.id} href={article.url} target="_blank" rel="noreferrer">
                 <span>{cleanArticleText(article.title, '未命名文章')}</span>
                 <small>{article.category || '其他'} · 重要程度：{importanceLabel(article.importance)}</small>
               </a>
-            ))}
-          </div>
+            )}
+          </PagedItems>
           {stats.negativeAlerts.length === 0 && <p className="emptyState">近一個月沒有負面預警。</p>}
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>Dcard 熱門文章排行</h3>
+          <PagedItems items={stats.dcardTopPosts || []} className="warningList">
+            {(post) => (
+              <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(post.title, '未命名文章')}</span>
+                <small>
+                  {post.like_count == null ? '按讚數未提供' : `${numberFormat.format(Number(post.like_count) || 0)} 個讚`}
+                  {' · '}
+                  {post.comment_count == null ? '留言數未提供' : `${numberFormat.format(Number(post.comment_count) || 0)} 則留言`}
+                </small>
+              </a>
+            )}
+          </PagedItems>
+          {stats.dcardTopPosts?.length === 0 && <p className="emptyState">目前沒有 Dcard 文章資料。</p>}
+        </div>
+        <div className="panel">
+          <h3>Dcard 熱門討論關鍵字</h3>
+          <PagedItems items={stats.dcardDiscussionKeywords || []} className="keywordRanking" ordered>
+            {(item, index, globalIndex) => (
+              <li key={item.name}>
+                <strong>{globalIndex + 1}</strong>
+                <span>{item.name}</span>
+                <b>{item.value} 則</b>
+              </li>
+            )}
+          </PagedItems>
+          {stats.dcardDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 Dcard 關鍵字資料。</p>}
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>PTT 熱門文章</h3>
+          <PagedItems items={stats.pttTopPosts || []} className="warningList">
+            {(post) => (
+              <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(post.title, '未命名文章')}</span>
+                <small>{post.author || '未知作者'} · {post.source_name || 'PTT'} · {numberFormat.format(Number(post.push_count) || 0)} 推</small>
+              </a>
+            )}
+          </PagedItems>
+          {stats.pttTopPosts?.length === 0 && <p className="emptyState">目前沒有 PTT 文章資料。</p>}
+        </div>
+        <div className="panel">
+          <h3>PTT 熱門關鍵字</h3>
+          <PagedItems items={stats.pttDiscussionKeywords || []} className="keywordRanking" ordered>
+            {(item, index, globalIndex) => (
+              <li key={item.name}>
+                <strong>{globalIndex + 1}</strong>
+                <span>{item.name}</span>
+                <b>{item.value} 則</b>
+              </li>
+            )}
+          </PagedItems>
+          {stats.pttDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 PTT 關鍵字資料。</p>}
+        </div>
+      </section>
+      <section className="chartGrid">
+        <div className="panel">
+          <h3>YouTube 熱門頻道排行</h3>
+          <PagedItems items={stats.youtubeTopChannels || []} className="keywordRanking" ordered>
+            {(channel, index, globalIndex) => (
+              <li key={channel.name}>
+                <strong>{globalIndex + 1}</strong>
+                <span>{channel.name}</span>
+                <b>{channel.value} 部</b>
+              </li>
+            )}
+          </PagedItems>
+          {stats.youtubeTopChannels?.length === 0 && <p className="emptyState">目前沒有 YouTube 頻道資料。</p>}
+        </div>
+        <div className="panel">
+          <h3>YouTube 觀看數前 10 名</h3>
+          <PagedItems items={stats.youtubeTopVideos || []} className="warningList">
+            {(video) => (
+              <a key={video.id} href={video.url} target="_blank" rel="noreferrer">
+                <span>{cleanArticleText(video.title, '未命名影片')}</span>
+                <small>{video.channel_name || '未知頻道'} · {numberFormat.format(Number(video.view_count) || 0)} 次觀看</small>
+              </a>
+            )}
+          </PagedItems>
+          {stats.youtubeTopVideos?.length === 0 && <p className="emptyState">目前沒有 YouTube 觀看數資料。</p>}
         </div>
       </section>
       <section className="chartGrid">
@@ -211,91 +324,6 @@ export default function Dashboard() {
           items={stats.googleReviewRestaurantRanking}
           emptyText="目前沒有餐廳口碑資料。"
         />
-      </section>
-      <section className="chartGrid">
-        <div className="panel">
-          <h3>Dcard 熱門文章排行</h3>
-          <div className="warningList">
-            {(stats.dcardTopPosts || []).map((post) => (
-              <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
-                <span>{cleanArticleText(post.title, '未命名文章')}</span>
-                <small>
-                  {post.like_count == null ? '按讚數未提供' : `${numberFormat.format(Number(post.like_count) || 0)} 個讚`}
-                  {' · '}
-                  {post.comment_count == null ? '留言數未提供' : `${numberFormat.format(Number(post.comment_count) || 0)} 則留言`}
-                </small>
-              </a>
-            ))}
-          </div>
-          {stats.dcardTopPosts?.length === 0 && <p className="emptyState">目前沒有 Dcard 文章資料。</p>}
-        </div>
-        <div className="panel">
-          <h3>Dcard 熱門討論關鍵字</h3>
-          <ol className="keywordRanking">
-            {(stats.dcardDiscussionKeywords || []).map((item, index) => (
-              <li key={item.name}>
-                <strong>{index + 1}</strong>
-                <span>{item.name}</span>
-                <b>{item.value} 則</b>
-              </li>
-            ))}
-          </ol>
-          {stats.dcardDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 Dcard 關鍵字資料。</p>}
-        </div>
-      </section>
-      <section className="chartGrid">
-        <div className="panel">
-          <h3>PTT 熱門文章</h3>
-          <div className="warningList">
-            {(stats.pttTopPosts || []).map((post) => (
-              <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
-                <span>{cleanArticleText(post.title, '未命名文章')}</span>
-                <small>{post.author || '未知作者'} · {post.source_name || 'PTT'} · {numberFormat.format(Number(post.push_count) || 0)} 推</small>
-              </a>
-            ))}
-          </div>
-          {stats.pttTopPosts?.length === 0 && <p className="emptyState">目前沒有 PTT 文章資料。</p>}
-        </div>
-        <div className="panel">
-          <h3>PTT 熱門關鍵字</h3>
-          <ol className="keywordRanking">
-            {(stats.pttDiscussionKeywords || []).map((item, index) => (
-              <li key={item.name}>
-                <strong>{index + 1}</strong>
-                <span>{item.name}</span>
-                <b>{item.value} 則</b>
-              </li>
-            ))}
-          </ol>
-          {stats.pttDiscussionKeywords?.length === 0 && <p className="emptyState">目前沒有 PTT 關鍵字資料。</p>}
-        </div>
-      </section>
-      <section className="chartGrid">
-        <div className="panel">
-          <h3>YouTube 熱門頻道排行</h3>
-          <ol className="keywordRanking">
-            {(stats.youtubeTopChannels || []).map((channel, index) => (
-              <li key={channel.name}>
-                <strong>{index + 1}</strong>
-                <span>{channel.name}</span>
-                <b>{channel.value} 部</b>
-              </li>
-            ))}
-          </ol>
-          {stats.youtubeTopChannels?.length === 0 && <p className="emptyState">目前沒有 YouTube 頻道資料。</p>}
-        </div>
-        <div className="panel">
-          <h3>YouTube 觀看數前 10 名</h3>
-          <div className="warningList">
-            {(stats.youtubeTopVideos || []).map((video) => (
-              <a key={video.id} href={video.url} target="_blank" rel="noreferrer">
-                <span>{cleanArticleText(video.title, '未命名影片')}</span>
-                <small>{video.channel_name || '未知頻道'} · {numberFormat.format(Number(video.view_count) || 0)} 次觀看</small>
-              </a>
-            ))}
-          </div>
-          {stats.youtubeTopVideos?.length === 0 && <p className="emptyState">目前沒有 YouTube 觀看數資料。</p>}
-        </div>
       </section>
       <section className="chartGrid">
         <div className="panel">

@@ -259,6 +259,28 @@ a {
   color: #5e6d69;
 }
 
+.paginationControls {
+  align-items: center;
+  border-top: 1px solid #e5eeeb;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  min-height: 46px;
+  padding-top: 8px;
+}
+
+.paginationControls button {
+  min-width: 72px;
+  padding: 7px 10px;
+}
+
+.paginationControls span {
+  color: #5e6d69;
+  font-size: 14px;
+  min-width: 42px;
+  text-align: center;
+}
+
 .cardList {
   display: grid;
   gap: 14px;
