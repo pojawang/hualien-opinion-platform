@@ -83,18 +83,21 @@ function buildVolumeTrend(articles) {
   return days.map(({ name, value }) => ({ name, value }));
 }
 
-function buildDailySummary(todayArticles, keyword, popularKeywords) {
+function buildDailySummary(todayArticles, keyword, popularKeywords, negativeAlerts) {
   const subject = keyword ? `「${keyword}」` : '整體花蓮輿情';
   if (todayArticles.length === 0) {
-    return `今日尚未蒐集到${subject}的相關文章，建議稍後再次執行搜尋。`;
+    const warning = negativeAlerts.length > 0
+      ? `近一個月共有 ${negativeAlerts.length} 則負面訊息，建議優先查看負評預警。`
+      : '近一個月未發現負面訊息。';
+    return `今日尚未蒐集到${subject}的相關文章，建議稍後再次執行搜尋。${warning}`;
   }
 
   const topCategory = countBy(todayArticles, 'category').sort((a, b) => b.value - a.value)[0];
-  const negativeCount = todayArticles.filter((item) => item.sentiment === 'negative').length;
+  const negativeCount = negativeAlerts.length;
   const focus = popularKeywords[0]?.name;
   const warning = negativeCount > 0
-    ? `其中有 ${negativeCount} 則負面訊息，建議優先查看負評預警。`
-    : '目前未發現負面訊息。';
+    ? `近一個月共有 ${negativeCount} 則負面訊息，建議優先查看負評預警。`
+    : '近一個月未發現負面訊息。';
   const focusText = focus ? `熱門焦點為「${focus}」。` : '';
 
   return `今日共蒐集 ${todayArticles.length} 則${subject}相關文章，主要集中於「${topCategory?.name || '其他'}」分類。${focusText}${warning}`;
@@ -310,7 +313,7 @@ export async function handler(event) {
       volumeTrend: buildVolumeTrend(articles),
       popularKeywords,
       negativeAlerts,
-      dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords),
+      dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords, negativeAlerts),
       latestArticles: articles.filter((item) => item.platform !== 'google_reviews').slice(0, 10)
     });
   } catch (err) {
