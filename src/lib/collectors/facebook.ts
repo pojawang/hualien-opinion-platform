@@ -20,6 +20,9 @@ const NEGATIVE_WORDS = ['失望', '糟', '爛', '危險', '災情', '塞車', '�
 function pageIdentifier(value: string) {
   try {
     const url = new URL(value);
+    if (url.pathname.toLowerCase().startsWith('/groups/')) {
+      return '__facebook_group__';
+    }
     const queryId = url.searchParams.get('id');
     if (queryId) return queryId;
     const parts = url.pathname.split('/').filter(Boolean);
@@ -28,6 +31,16 @@ function pageIdentifier(value: string) {
   } catch {
     return '';
   }
+}
+
+function friendlyGraphError(message: string) {
+  if (/pages_read_engagement|Page Public Content Access|Page Public Metadata Access/i.test(message)) {
+    return 'Meta 權限不足：Token 需要 pages_read_engagement，且 App 必須取得 Page Public Content Access 或 Page Public Metadata Access';
+  }
+  if (/Unsupported get request|Missing Permission|Object does not exist/i.test(message)) {
+    return '無法讀取此粉專：請確認網址正確，且目前的 Meta App 與 Token 有權存取該粉專';
+  }
+  return message;
 }
 
 function classify(text: string, preferred = '') {
@@ -111,6 +124,7 @@ export async function collectFacebookPages(options: CollectorOptions) {
   for (const configuredPage of options.pages) {
     try {
       const identifier = pageIdentifier(configuredPage.page_url);
+      if (identifier === '__facebook_group__') throw new Error('此監測只支援 Facebook 粉專，不支援社團');
       if (!identifier) throw new Error('無法辨識粉專網址');
       const page = await graphRequest(encodeURIComponent(identifier), { fields: 'id,name' }, options);
       const posts = await graphRequest(`${encodeURIComponent(page.id)}/posts`, {
@@ -150,7 +164,10 @@ export async function collectFacebookPages(options: CollectorOptions) {
         .eq('id', configuredPage.id);
       if (pageError) throw pageError;
     } catch (error: any) {
-      errors.push({ page: configuredPage.page_name || configuredPage.page_url, message: error?.message || '讀取失敗' });
+      errors.push({
+        page: configuredPage.page_name || configuredPage.page_url,
+        message: friendlyGraphError(error?.message || '讀取失敗')
+      });
     }
   }
 

@@ -63,7 +63,9 @@ export default function FacebookPages() {
     setMessage('');
     try {
       const result = await apiFetch('collect-facebook-pages', { method: 'POST' });
-      setMessage(`巡查完成：找到 ${result.matched || 0} 則，新增或更新 ${result.upserted || 0} 則。`);
+      setMessage(result.errors?.length
+        ? `巡查完成：找到 ${result.matched || 0} 則，新增或更新 ${result.upserted || 0} 則；${result.errors.length} 個來源讀取失敗。`
+        : `巡查完成：找到 ${result.matched || 0} 則，新增或更新 ${result.upserted || 0} 則。`);
       if (result.errors?.length) setError(result.errors.map((item) => `${item.page}：${item.message}`).join('；'));
       await load();
     } catch (err) {

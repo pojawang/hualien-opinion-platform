@@ -5,6 +5,7 @@ function normalizeFacebookUrl(value) {
     const url = new URL(String(value || '').trim());
     const hostname = url.hostname.replace(/^www\./, '').toLowerCase();
     if (!['facebook.com', 'm.facebook.com'].includes(hostname)) return '';
+    if (url.pathname.toLowerCase().startsWith('/groups/')) return '';
     url.protocol = 'https:';
     url.hostname = 'www.facebook.com';
     url.hash = '';
@@ -37,7 +38,7 @@ export async function handler(event) {
     if (event.httpMethod === 'POST') {
       const body = parseBody(event);
       const pageUrl = normalizeFacebookUrl(body.page_url);
-      if (!pageUrl) return json(400, { error: '請輸入有效的 Facebook 粉專網址' });
+      if (!pageUrl) return json(400, { error: '請輸入有效的 Facebook 粉專網址；此功能不支援 Facebook 社團網址' });
       const { data, error } = await supabase.from('facebook_pages').insert({
         page_name: initialName(pageUrl),
         page_url: pageUrl,
