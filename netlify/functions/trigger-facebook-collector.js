@@ -1,8 +1,8 @@
-import { guard, json } from './_utils.js';
+import { isAdminRequest, json } from './_utils.js';
 
 export async function handler(event) {
   try {
-    guard(event);
+    if (!(await isAdminRequest(event))) return json(403, { error: '僅管理員可啟動 Facebook 巡查' });
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
     const token = process.env.GITHUB_ACTIONS_TOKEN;

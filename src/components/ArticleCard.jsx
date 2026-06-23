@@ -1,4 +1,5 @@
 import StatusBadge from './StatusBadge.jsx';
+import { getCurrentUser } from '../lib/supabase.js';
 import {
   cleanArticleText,
   importanceLabel,
@@ -8,6 +9,7 @@ import {
 } from '../lib/labels.js';
 
 export default function ArticleCard({ article, onUpdate }) {
+  const canManage = getCurrentUser()?.role === 'admin';
   return (
     <article className="articleCard">
       <div className="articleTop">
@@ -27,18 +29,22 @@ export default function ArticleCard({ article, onUpdate }) {
       </div>
       <div className="actions">
         <a href={article.url} target="_blank" rel="noreferrer">原文連結</a>
-        <button onClick={() => onUpdate(article.id, { status: 'approved' })}>核准</button>
-        <button onClick={() => onUpdate(article.id, { status: 'rejected' })}>拒絕</button>
-        <button onClick={() => onUpdate(article.id, { status: 'pending' })}>重置</button>
-        <select
-          value={article.importance || 'medium'}
-          onChange={(event) => onUpdate(article.id, { importance: event.target.value })}
-        >
-          <option value="low">低</option>
-          <option value="medium">中</option>
-          <option value="high">高</option>
-          <option value="urgent">緊急</option>
-        </select>
+        {canManage && (
+          <>
+            <button onClick={() => onUpdate(article.id, { status: 'approved' })}>核准</button>
+            <button onClick={() => onUpdate(article.id, { status: 'rejected' })}>拒絕</button>
+            <button onClick={() => onUpdate(article.id, { status: 'pending' })}>重置</button>
+            <select
+              value={article.importance || 'medium'}
+              onChange={(event) => onUpdate(article.id, { importance: event.target.value })}
+            >
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+              <option value="urgent">緊急</option>
+            </select>
+          </>
+        )}
       </div>
     </article>
   );

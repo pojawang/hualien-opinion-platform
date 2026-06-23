@@ -1,8 +1,11 @@
-import { guard, json, parseBody, supabaseAdmin, upsertDefaultsIfEmpty } from './_utils.js';
+import { guard, isAdminRequest, json, parseBody, supabaseAdmin, upsertDefaultsIfEmpty } from './_utils.js';
 
 export async function handler(event) {
   try {
     guard(event);
+    if (event.httpMethod !== 'GET' && !(await isAdminRequest(event))) {
+      return json(403, { error: '一般使用者僅能查看關鍵字' });
+    }
     const supabase = supabaseAdmin();
     await upsertDefaultsIfEmpty(supabase);
 

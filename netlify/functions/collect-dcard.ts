@@ -1,10 +1,12 @@
 import { collectDcardPosts } from '../../src/lib/collectors/dcard.ts';
-import { guard, json, supabaseAdmin } from './_utils.js';
+import { isAdminRequest, json, supabaseAdmin } from './_utils.js';
 
 export async function handler(event: any) {
   try {
     const isScheduled = event.httpMethod === undefined || event.headers?.['x-netlify-scheduled'] === 'true';
-    if (!isScheduled) guard(event);
+    if (!isScheduled) {
+      if (!(await isAdminRequest(event))) return json(403, { error: '僅管理員可執行 Dcard 蒐集' });
+    }
     if (!isScheduled && event.httpMethod !== 'POST') {
       return json(405, { error: 'Method not allowed' });
     }

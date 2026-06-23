@@ -1,4 +1,4 @@
-import { guard, json, supabaseAdmin } from './_utils.js';
+import { isAdminRequest, json, supabaseAdmin } from './_utils.js';
 
 function buildMessage(article) {
   return [
@@ -38,7 +38,7 @@ async function sendLineMessage(messages) {
 
 export async function handler(event) {
   try {
-    guard(event);
+    if (!(await isAdminRequest(event))) return json(403, { error: '僅管理員可執行推播' });
 
     if (event.httpMethod !== 'POST') {
       return json(405, { error: 'Method not allowed' });

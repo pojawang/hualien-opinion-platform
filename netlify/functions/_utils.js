@@ -98,6 +98,17 @@ export function guard(event) {
   return verifyRequest(event);
 }
 
+export async function isAdminRequest(event) {
+  const actor = guard(event);
+  if (actor.role !== 'admin') return false;
+  const { data, error } = await supabaseAdmin()
+    .from('users')
+    .select('role, enabled')
+    .eq('id', actor.sub)
+    .single();
+  return !error && data?.role === 'admin' && data?.enabled !== false;
+}
+
 export function allowedMethod(event, methods) {
   return methods.includes(event.httpMethod);
 }

@@ -371,6 +371,10 @@ a {
   padding: 12px;
 }
 
+.facebookPageRow.readOnly {
+  grid-template-columns: minmax(240px, 1fr) 130px 180px;
+}
+
 .facebookPageRow > div {
   display: grid;
   gap: 4px;
@@ -492,6 +496,15 @@ a {
   color: #047857;
 }
 
+.readOnlyNotice {
+  background: #f0f7f5;
+  border: 1px solid #b9d8d1;
+  border-radius: 8px;
+  color: #285c55;
+  font-weight: 700;
+  padding: 12px 14px;
+}
+
 .filters > *,
 .formRow > * {
   flex: 1 1 150px;
@@ -518,6 +531,14 @@ a {
 
 .tableRow.wide {
   grid-template-columns: 1fr 90px minmax(220px, 2fr) 80px 80px 80px 80px;
+}
+
+.tableRow.readOnly {
+  grid-template-columns: 1fr 150px 100px;
+}
+
+.tableRow.wide.readOnly {
+  grid-template-columns: 1fr 90px minmax(220px, 2fr) 80px;
 }
 
 .tableRow:last-child {

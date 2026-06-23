@@ -1,8 +1,11 @@
-import { guard, json, parseBody, supabaseAdmin } from './_utils.js';
+import { guard, isAdminRequest, json, parseBody, supabaseAdmin } from './_utils.js';
 
 export async function handler(event) {
   try {
     guard(event);
+    if (event.httpMethod !== 'GET' && !(await isAdminRequest(event))) {
+      return json(403, { error: '一般使用者僅能查看文章' });
+    }
     const supabase = supabaseAdmin();
 
     if (event.httpMethod === 'GET') {

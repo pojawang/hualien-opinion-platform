@@ -1,7 +1,7 @@
 import {
   fetchMeta,
   fetchWithTimeout,
-  guard,
+  isAdminRequest,
   json,
   normalizeArticle,
   parseBody,
@@ -460,7 +460,7 @@ export async function handler(event) {
   try {
     const isScheduled = event.httpMethod === undefined || event.headers?.['x-netlify-scheduled'] === 'true';
     if (!isScheduled) {
-      guard(event);
+      if (!(await isAdminRequest(event))) return json(403, { error: '僅管理員可執行搜尋蒐集' });
     }
 
     if (!isScheduled && event.httpMethod !== 'POST') {

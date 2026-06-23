@@ -1,6 +1,7 @@
 import {
   fetchMeta,
   guard,
+  isAdminRequest,
   json,
   normalizeSourceType,
   parseBody,
@@ -88,6 +89,9 @@ async function testSource(body) {
 export async function handler(event) {
   try {
     guard(event);
+    if (event.httpMethod !== 'GET' && !(await isAdminRequest(event))) {
+      return json(403, { error: '一般使用者僅能查看來源' });
+    }
     const supabase = supabaseAdmin();
 
     if (event.httpMethod === 'GET') {

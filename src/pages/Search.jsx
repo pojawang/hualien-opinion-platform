@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiFetch } from '../lib/supabase.js';
+import { apiFetch, getCurrentUser } from '../lib/supabase.js';
 
 function collectorErrorMessage(message) {
   if (String(message).includes("Could not find the table 'public.posts'")) {
@@ -9,6 +9,7 @@ function collectorErrorMessage(message) {
 }
 
 export default function Search() {
+  const canManage = getCurrentUser()?.role === 'admin';
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -106,8 +107,9 @@ export default function Search() {
           <h2>搜尋蒐集</h2>
           <p>分批執行 Search、News、Videos、Places、RSS、Sitemap、Dcard 與 PTT 蒐集</p>
         </div>
-        <button onClick={runSearch} disabled={loading}>{loading ? '蒐集中...' : '開始搜尋'}</button>
+        {canManage && <button onClick={runSearch} disabled={loading}>{loading ? '蒐集中...' : '開始搜尋'}</button>}
       </header>
+      {!canManage && <div className="readOnlyNotice">唯讀模式：僅管理員可執行搜尋蒐集。</div>}
       {progress && <div className="notice">目前進度：{progress}</div>}
       {error && <div className="alert">{error}</div>}
       {result && (

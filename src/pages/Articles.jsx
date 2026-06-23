@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import ArticleCard from '../components/ArticleCard.jsx';
-import { apiFetch } from '../lib/supabase.js';
+import { apiFetch, getCurrentUser } from '../lib/supabase.js';
 
 const blankFilters = {
   status: '',
@@ -10,6 +10,7 @@ const blankFilters = {
 };
 
 export default function Articles() {
+  const canManage = getCurrentUser()?.role === 'admin';
   const [articles, setArticles] = useState([]);
   const [filters, setFilters] = useState(blankFilters);
   const [error, setError] = useState('');
@@ -45,6 +46,7 @@ export default function Articles() {
         </div>
       </header>
       {error && <div className="alert">{error}</div>}
+      {!canManage && <div className="readOnlyNotice">唯讀模式：僅管理員可核准、拒絕、重置或修改重要程度。</div>}
       <section className="filters panel">
         <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
           <option value="">全部狀態</option>

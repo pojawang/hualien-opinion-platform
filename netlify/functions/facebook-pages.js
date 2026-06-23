@@ -1,4 +1,4 @@
-import { guard, json, parseBody, supabaseAdmin } from './_utils.js';
+import { guard, isAdminRequest, json, parseBody, supabaseAdmin } from './_utils.js';
 
 function normalizeFacebookUrl(value) {
   try {
@@ -27,6 +27,9 @@ function initialName(url) {
 export async function handler(event) {
   try {
     guard(event);
+    if (event.httpMethod !== 'GET' && !(await isAdminRequest(event))) {
+      return json(403, { error: '一般使用者僅能查看 Facebook 監測來源' });
+    }
     const supabase = supabaseAdmin();
 
     if (event.httpMethod === 'GET') {

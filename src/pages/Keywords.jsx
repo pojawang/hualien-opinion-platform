@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../lib/supabase.js';
+import { apiFetch, getCurrentUser } from '../lib/supabase.js';
 
 export default function Keywords() {
+  const canManage = getCurrentUser()?.role === 'admin';
   const [keywords, setKeywords] = useState([]);
   const [form, setForm] = useState({ keyword: '', category: '其他' });
   const [error, setError] = useState('');
@@ -45,7 +46,8 @@ export default function Keywords() {
         </div>
       </header>
       {error && <div className="alert">{error}</div>}
-      <form className="formRow panel" onSubmit={create}>
+      {!canManage && <div className="readOnlyNotice">唯讀模式：僅管理員可新增、停用或刪除關鍵字。</div>}
+      {canManage && <form className="formRow panel" onSubmit={create}>
         <input
           placeholder="關鍵字"
           value={form.keyword}
@@ -58,17 +60,17 @@ export default function Keywords() {
           ))}
         </select>
         <button>新增</button>
-      </form>
+      </form>}
       <section className="tablePanel">
         {keywords.map((item) => (
-          <div className="tableRow" key={item.id}>
+          <div className={`tableRow${canManage ? '' : ' readOnly'}`} key={item.id}>
             <strong>{item.keyword}</strong>
             <span>{item.category || '其他'}</span>
             <span>{item.enabled ? '啟用' : '停用'}</span>
-            <button onClick={() => patchKeyword(item.id, { enabled: !item.enabled })}>
+            {canManage && <button onClick={() => patchKeyword(item.id, { enabled: !item.enabled })}>
               {item.enabled ? '停用' : '啟用'}
-            </button>
-            <button onClick={() => remove(item.id)}>刪除</button>
+            </button>}
+            {canManage && <button onClick={() => remove(item.id)}>刪除</button>}
           </div>
         ))}
       </section>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../lib/supabase.js';
+import { apiFetch, getCurrentUser } from '../lib/supabase.js';
 import { sourceTypeLabel, sourceTypeOptions } from '../lib/labels.js';
 
 export default function Sources() {
+  const canManage = getCurrentUser()?.role === 'admin';
   const [sources, setSources] = useState([]);
   const [form, setForm] = useState({ name: '', source_type: 'rss', url: '' });
   const [message, setMessage] = useState('');
@@ -68,7 +69,8 @@ export default function Sources() {
       </header>
       {error && <div className="alert">{error}</div>}
       {message && <div className="notice">{message}</div>}
-      <form className="formGrid panel" onSubmit={create}>
+      {!canManage && <div className="readOnlyNotice">唯讀模式：僅管理員可新增、測試、停用或刪除來源。</div>}
+      {canManage && <form className="formGrid panel" onSubmit={create}>
         <input placeholder="來源名稱" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
         <select value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value })}>
           {sourceTypeOptions.map(([value, label]) => (
@@ -77,17 +79,17 @@ export default function Sources() {
         </select>
         <input placeholder="URL" value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} required />
         <button>新增來源</button>
-      </form>
+      </form>}
       <section className="tablePanel">
         {sources.map((item) => (
-          <div className="tableRow wide" key={item.id}>
+          <div className={`tableRow wide${canManage ? '' : ' readOnly'}`} key={item.id}>
             <strong>{item.name}</strong>
             <span>{sourceTypeLabel(item.source_type)}</span>
             <span className="truncate">{item.url}</span>
             <span>{item.enabled ? '啟用' : '停用'}</span>
-            <button onClick={() => testSource(item)}>測試</button>
-            <button onClick={() => patchSource(item.id, { enabled: !item.enabled })}>{item.enabled ? '停用' : '啟用'}</button>
-            <button onClick={() => remove(item.id)}>刪除</button>
+            {canManage && <button onClick={() => testSource(item)}>測試</button>}
+            {canManage && <button onClick={() => patchSource(item.id, { enabled: !item.enabled })}>{item.enabled ? '停用' : '啟用'}</button>}
+            {canManage && <button onClick={() => remove(item.id)}>刪除</button>}
           </div>
         ))}
       </section>
