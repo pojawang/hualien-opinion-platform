@@ -8,7 +8,8 @@ import Keywords from './pages/Keywords.jsx';
 import Sources from './pages/Sources.jsx';
 import Reports from './pages/Reports.jsx';
 import FacebookPages from './pages/FacebookPages.jsx';
-import { getToken } from './lib/supabase.js';
+import Users from './pages/Users.jsx';
+import { getCurrentUser, getToken } from './lib/supabase.js';
 
 function PrivateRoute({ children }) {
   if (!getToken()) {
@@ -23,6 +24,12 @@ function PrivateRoute({ children }) {
   );
 }
 
+function AdminRoute({ children }) {
+  if (!getToken()) return <Navigate to="/login" replace />;
+  if (getCurrentUser()?.role !== 'admin') return <Navigate to="/" replace />;
+  return <PrivateRoute>{children}</PrivateRoute>;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -34,6 +41,7 @@ export default function App() {
       <Route path="/sources" element={<PrivateRoute><Sources /></PrivateRoute>} />
       <Route path="/facebook-pages" element={<PrivateRoute><FacebookPages /></PrivateRoute>} />
       <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
+      <Route path="/users" element={<AdminRoute><Users /></AdminRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

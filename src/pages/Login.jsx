@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch, setToken } from '../lib/supabase.js';
+import { apiFetch, setCurrentUser, setToken } from '../lib/supabase.js';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,6 +24,7 @@ export default function Login() {
         body: JSON.stringify(form)
       });
       setToken(data.token);
+      setCurrentUser(data.user);
       navigate('/');
     } catch (err) {
       setError(err.message);

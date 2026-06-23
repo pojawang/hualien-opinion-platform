@@ -15,8 +15,27 @@ export function setToken(token) {
   localStorage.setItem('hualien_token', token);
 }
 
+export function setCurrentUser(user) {
+  localStorage.setItem('hualien_user', JSON.stringify(user));
+}
+
+export function getCurrentUser() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('hualien_user') || 'null');
+    if (stored) return stored;
+    const token = getToken();
+    if (!token) return null;
+    const segment = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(segment.padEnd(Math.ceil(segment.length / 4) * 4, '=')));
+    return { id: payload.sub, username: payload.username, role: payload.role };
+  } catch {
+    return null;
+  }
+}
+
 export function clearToken() {
   localStorage.removeItem('hualien_token');
+  localStorage.removeItem('hualien_user');
 }
 
 export async function apiFetch(path, options = {}) {

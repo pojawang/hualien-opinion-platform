@@ -324,6 +324,39 @@ a {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.userCreateForm {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) 150px auto;
+}
+
+.userRow {
+  align-items: center;
+  border-bottom: 1px solid #e5eeeb;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) 140px minmax(210px, 1fr) auto auto auto;
+  padding: 12px;
+}
+
+.userRow:last-child {
+  border-bottom: 0;
+}
+
+.userIdentity {
+  display: grid;
+  gap: 4px;
+}
+
+.userIdentity span {
+  color: #5e6d69;
+  font-size: 13px;
+}
+
+.dangerButton {
+  background: #b91c1c;
+}
+
 .scheduleStatus {
   color: #0f766e;
   font-weight: 700;
@@ -536,6 +569,8 @@ a {
   .formGrid,
   .facebookPageForm,
   .facebookPageRow,
+  .userCreateForm,
+  .userRow,
   .tableRow,
   .tableRow.wide {
     grid-template-columns: 1fr;

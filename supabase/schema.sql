@@ -4,7 +4,8 @@ create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   username text unique not null,
   password_hash text not null,
-  role text default 'admin',
+  role text default 'admin' check (role in ('admin', 'user')),
+  enabled boolean not null default true,
   created_at timestamp default now()
 );
 

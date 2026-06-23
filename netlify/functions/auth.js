@@ -18,13 +18,21 @@ export async function handler(event) {
     }
 
     const supabase = supabaseAdmin();
-    const { data: user, error } = await supabase
+    let userResult = await supabase
       .from('users')
-      .select('id, username, password_hash, role')
+      .select('id, username, password_hash, role, enabled')
       .eq('username', username)
       .single();
+    if (userResult.error?.message?.includes('enabled')) {
+      userResult = await supabase
+        .from('users')
+        .select('id, username, password_hash, role')
+        .eq('username', username)
+        .single();
+    }
+    const { data: user, error } = userResult;
 
-    if (error || !user) {
+    if (error || !user || user.enabled === false) {
       return json(401, { error: '帳號或密碼錯誤' });
     }
 

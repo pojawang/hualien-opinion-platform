@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { clearToken } from '../lib/supabase.js';
+import { clearToken, getCurrentUser } from '../lib/supabase.js';
 
 const links = [
   { to: '/', label: '儀表板' },
@@ -8,11 +8,13 @@ const links = [
   { to: '/keywords', label: '關鍵字' },
   { to: '/sources', label: '來源' },
   { to: '/facebook-pages', label: 'Facebook監測' },
-  { to: '/reports', label: '報表' }
+  { to: '/reports', label: '報表' },
+  { to: '/users', label: '帳號管理', adminOnly: true }
 ];
 
 export default function Navbar() {
   const navigate = useNavigate();
+  const currentUser = getCurrentUser();
 
   function logout() {
     clearToken();
@@ -26,7 +28,7 @@ export default function Navbar() {
         <p>花蓮輿情監測</p>
       </div>
       <nav>
-        {links.map((link) => (
+        {links.filter((link) => !link.adminOnly || currentUser?.role === 'admin').map((link) => (
           <NavLink key={link.to} to={link.to} end={link.to === '/'}>
             {link.label}
           </NavLink>
