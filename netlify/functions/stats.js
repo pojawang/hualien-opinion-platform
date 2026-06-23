@@ -67,6 +67,18 @@ function matchesKeyword(article, keyword) {
   return false;
 }
 
+function isFacebookPostUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (!/(^|\.)facebook\.com$/i.test(url.hostname)) return false;
+    if (url.searchParams.has('story_fbid') || url.searchParams.has('fbid') || url.searchParams.has('v')) return true;
+    return /\/(?:posts|permalink|videos|reel)\/[^/]+/i.test(url.pathname)
+      || /\/share\/(?:p|v)\/[^/]+/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function buildVolumeTrend(articles) {
   const days = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(Date.now() - (6 - index) * 86400000);
@@ -187,7 +199,11 @@ function buildGoogleReviewStats(articles) {
 }
 
 function buildFacebookStats(articles) {
-  const posts = articles.filter((item) => item.platform === 'facebook_page' && item.post_id);
+  const posts = articles.filter((item) => (
+    item.platform === 'facebook_page'
+    && item.post_id
+    && isFacebookPostUrl(item.url)
+  ));
   const trendDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(Date.now() - (6 - index) * 86400000);
     const key = dateKey(date);
