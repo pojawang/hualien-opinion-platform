@@ -244,7 +244,7 @@ export default function Dashboard() {
         </div>
         <div className="panel warningPanel">
           <div className="sectionHeading">
-            <h3>近一個月負評預警</h3>
+            <h3>近一週負評預警</h3>
             <span>{stats.negativeAlerts.length} 則</span>
           </div>
           <PagedItems items={stats.negativeAlerts} className="warningList">
@@ -255,7 +255,7 @@ export default function Dashboard() {
               </a>
             )}
           </PagedItems>
-          {stats.negativeAlerts.length === 0 && <p className="emptyState">近一個月沒有負面預警。</p>}
+          {stats.negativeAlerts.length === 0 && <p className="emptyState">近一週沒有負面預警。</p>}
         </div>
       </section>
       <section className="chartGrid" hidden={!visibleSections.facebook}>

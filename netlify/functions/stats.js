@@ -99,8 +99,8 @@ function buildDailySummary(todayArticles, keyword, popularKeywords, negativeAler
   const subject = keyword ? `「${keyword}」` : '整體花蓮輿情';
   if (todayArticles.length === 0) {
     const warning = negativeAlerts.length > 0
-      ? `近一個月共有 ${negativeAlerts.length} 則負面訊息，建議優先查看負評預警。`
-      : '近一個月未發現負面訊息。';
+      ? `近一週共有 ${negativeAlerts.length} 則負面訊息，建議優先查看負評預警。`
+      : '近一週未發現負面訊息。';
     return `今日尚未蒐集到${subject}的相關文章，建議稍後再次執行搜尋。${warning}`;
   }
 
@@ -108,8 +108,8 @@ function buildDailySummary(todayArticles, keyword, popularKeywords, negativeAler
   const negativeCount = negativeAlerts.length;
   const focus = popularKeywords[0]?.name;
   const warning = negativeCount > 0
-    ? `近一個月共有 ${negativeCount} 則負面訊息，建議優先查看負評預警。`
-    : '近一個月未發現負面訊息。';
+    ? `近一週共有 ${negativeCount} 則負面訊息，建議優先查看負評預警。`
+    : '近一週未發現負面訊息。';
   const focusText = focus ? `熱門焦點為「${focus}」。` : '';
 
   return `今日共蒐集 ${todayArticles.length} 則${subject}相關文章，主要集中於「${topCategory?.name || '其他'}」分類。${focusText}${warning}`;
@@ -269,8 +269,7 @@ export async function handler(event) {
     const params = event.queryStringParameters || {};
     const selectedKeyword = (params.keyword || '').trim();
     const today = dateKey();
-    const negativeCutoff = new Date();
-    negativeCutoff.setMonth(negativeCutoff.getMonth() - 1);
+    const negativeCutoff = new Date(Date.now() - 7 * 86400000);
     const facebookCutoff = new Date(Date.now() - 7 * 86400000);
 
     const [articleResult, keywordResult, postResult, negativeResult, facebookResult] = await Promise.all([
