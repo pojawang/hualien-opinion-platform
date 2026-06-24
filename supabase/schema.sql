@@ -110,6 +110,18 @@ create table if not exists posts (
   updated_at timestamptz default now()
 );
 
+-- 所有資料存取均經由 Netlify Functions 的 Service Role；公開角色採預設拒絕。
+alter table users enable row level security;
+alter table keywords enable row level security;
+alter table sources enable row level security;
+alter table articles enable row level security;
+alter table facebook_pages enable row level security;
+alter table broadcasts enable row level security;
+alter table posts enable row level security;
+
+revoke all privileges on table users, keywords, sources, articles, facebook_pages, broadcasts, posts
+  from anon, authenticated;
+
 create index if not exists idx_articles_status on articles(status);
 create index if not exists idx_articles_category on articles(category);
 create index if not exists idx_articles_created_at on articles(created_at desc);
