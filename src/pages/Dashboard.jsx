@@ -25,6 +25,7 @@ import {
 } from '../lib/labels.js';
 
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
+const barColors = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#2563eb', '#7c3aed'];
 const numberFormat = new Intl.NumberFormat('zh-TW');
 const PAGE_SIZE = 5;
 const sectionOptions = [
@@ -41,6 +42,11 @@ const sectionOptions = [
   ['latest', '最新文章']
 ];
 const defaultVisibleSections = Object.fromEntries(sectionOptions.map(([key]) => [key, true]));
+
+function rankWidth(value, maxValue) {
+  if (!maxValue) return '8%';
+  return `${Math.max(8, Math.round((Number(value) / maxValue) * 100))}%`;
+}
 
 function initialVisibleSections() {
   try {
@@ -79,8 +85,11 @@ function PagedItems({ items = [], className, ordered = false, children }) {
 
 function ReviewRanking({ title, items = [], emptyText }) {
   return (
-    <div className="panel">
-      <h3>{title}</h3>
+    <div className="panel insightPanel">
+      <div className="panelTitle">
+        <span className="panelAccent" />
+        <h3>{title}</h3>
+      </div>
       <PagedItems items={items} className="warningList">
         {(place) => (
           <a key={place.id} href={place.url} target="_blank" rel="noreferrer">
@@ -138,13 +147,27 @@ export default function Dashboard() {
     ...item,
     name: sourceTypeLabel(item.name)
   }));
+  const maxKeywordCount = Math.max(...(stats.popularKeywords || []).map((item) => Number(item.value) || 0), 0);
+  const maxDcardKeywordCount = Math.max(...(stats.dcardDiscussionKeywords || []).map((item) => Number(item.value) || 0), 0);
+  const maxPttKeywordCount = Math.max(...(stats.pttDiscussionKeywords || []).map((item) => Number(item.value) || 0), 0);
+  const maxYoutubeChannelCount = Math.max(...(stats.youtubeTopChannels || []).map((item) => Number(item.value) || 0), 0);
+  const maxFacebookPageCount = Math.max(...(stats.facebookPageRanking || []).map((item) => Number(item.value) || 0), 0);
+  const statusTotal = Number(stats.pendingCount || 0) + Number(stats.approvedCount || 0) + Number(stats.rejectedCount || 0);
+  const approvedRate = statusTotal ? Math.round((Number(stats.approvedCount || 0) / statusTotal) * 100) : 0;
+  const warningLevel = Number(stats.negativeAlerts?.length || 0) > 0 ? '需要留意' : '穩定';
 
   return (
-    <div className="pageStack">
-      <header className="pageHeader">
+    <div className="pageStack dashboardPage">
+      <header className="pageHeader dashboardHero">
         <div>
-          <h2>儀表板</h2>
+          <span className="heroEyebrow">Hualien Opinion Command Center</span>
+          <h2>花蓮輿情儀表板</h2>
           <p>{selectedKeyword ? `「${selectedKeyword}」相關輿情總覽` : '今日輿情與審核狀態總覽'}</p>
+          <div className="heroPills">
+            <span>今日新增 {numberFormat.format(Number(stats.todayCount) || 0)} 則</span>
+            <span>負評預警 {numberFormat.format(Number(stats.negativeAlerts?.length) || 0)} 則</span>
+            <span>審核完成率 {approvedRate}%</span>
+          </div>
         </div>
         <label className="keywordPicker">
           <span>關鍵字</span>
@@ -164,7 +187,10 @@ export default function Dashboard() {
       </header>
       <section className="panel dashboardDisplayControls">
         <div className="sectionHeading">
-          <h3>儀表板顯示項目</h3>
+          <div>
+            <span className="sectionKicker">Display</span>
+            <h3>儀表板顯示項目</h3>
+          </div>
           <button type="button" className="secondaryButton" onClick={() => {
             setVisibleSections(defaultVisibleSections);
             localStorage.setItem('dashboard_visible_sections', JSON.stringify(defaultVisibleSections));
@@ -180,32 +206,37 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="statsGrid" hidden={!visibleSections.overview}>
-        <StatCard label="今日新增" value={stats.todayCount} />
-        <StatCard label="待審核" value={stats.pendingCount} />
-        <StatCard label="已核准" value={stats.approvedCount} />
-        <StatCard label="已拒絕" value={stats.rejectedCount} />
-        <StatCard label="已推播" value={stats.broadcastedCount} />
-        <StatCard label="Facebook 貼文" value={stats.facebookPostCount || 0} />
-        <StatCard label="YouTube 影片" value={stats.youtubeVideoCount || 0} />
-        <StatCard label="Dcard 聲量" value={stats.dcardCount || 0} />
-        <StatCard label="PTT 聲量" value={stats.pttCount || 0} />
-        <StatCard label="Google 評論地點" value={stats.googleReviewPlaceCount || 0} />
+        <StatCard label="今日新增" value={stats.todayCount} hint="今日進站文章" tone="teal" />
+        <StatCard label="待審核" value={stats.pendingCount} hint="需要人工判讀" tone="amber" />
+        <StatCard label="已核准" value={stats.approvedCount} hint="可推播內容" tone="green" />
+        <StatCard label="已拒絕" value={stats.rejectedCount} hint="已排除內容" tone="red" />
+        <StatCard label="已推播" value={stats.broadcastedCount} hint="LINE 已送出" tone="blue" />
+        <StatCard label="Facebook 貼文" value={stats.facebookPostCount || 0} hint="粉專監測量" tone="blue" />
+        <StatCard label="YouTube 影片" value={stats.youtubeVideoCount || 0} hint="影片聲量" tone="purple" />
+        <StatCard label="Dcard 聲量" value={stats.dcardCount || 0} hint="討論文章" tone="pink" />
+        <StatCard label="PTT 聲量" value={stats.pttCount || 0} hint="看板文章" tone="slate" />
+        <StatCard label="Google 評論地點" value={stats.googleReviewPlaceCount || 0} hint="口碑地點" tone="emerald" />
       </section>
       <section className="panel summaryPanel" hidden={!visibleSections.summary}>
         <div className="sectionHeading">
           <div>
+            <span className="sectionKicker">Daily Brief</span>
             <h3>AI 每日摘要</h3>
             <span>{selectedKeyword || '全部關鍵字'}</span>
           </div>
+          <strong className={warningLevel === '需要留意' ? 'riskBadge high' : 'riskBadge'}>{warningLevel}</strong>
         </div>
         <p>{stats.dailySummary}</p>
       </section>
       <section className="chartGrid" hidden={!visibleSections.trend}>
-        <div className="panel">
-          <h3>聲量趨勢</h3>
+        <div className="panel analyticsPanel">
+          <div className="panelTitle">
+            <span className="panelAccent" />
+            <h3>聲量趨勢</h3>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={stats.volumeTrend}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
               <XAxis dataKey="name" />
               <YAxis allowDecimals={false} />
               <Tooltip formatter={(value) => [`${value} 則`, '聲量']} />
@@ -213,8 +244,11 @@ export default function Dashboard() {
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <div className="panel">
-          <h3>情緒比例</h3>
+        <div className="panel analyticsPanel">
+          <div className="panelTitle">
+            <span className="panelAccent amber" />
+            <h3>情緒比例</h3>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie data={sentimentCounts} dataKey="value" nameKey="name" outerRadius={90} label>
@@ -229,11 +263,14 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="chartGrid" hidden={!visibleSections.keywords}>
-        <div className="panel">
-          <h3>熱門關鍵字排行榜</h3>
+        <div className="panel rankPanel">
+          <div className="panelTitle">
+            <span className="panelAccent" />
+            <h3>熱門關鍵字排行榜</h3>
+          </div>
           <PagedItems items={stats.popularKeywords} className="keywordRanking" ordered>
             {(item, index, globalIndex) => (
-              <li key={item.name}>
+              <li key={item.name} style={{ '--rank-width': rankWidth(item.value, maxKeywordCount), '--rank-color': barColors[globalIndex % barColors.length] }}>
                 <strong>{globalIndex + 1}</strong>
                 <span>{item.name}</span>
                 <b>{item.value} 則</b>
@@ -244,7 +281,10 @@ export default function Dashboard() {
         </div>
         <div className="panel warningPanel">
           <div className="sectionHeading">
-            <h3>近一週負評預警</h3>
+            <div className="panelTitle">
+              <span className="panelAccent red" />
+              <h3>近一週負評預警</h3>
+            </div>
             <span>{stats.negativeAlerts.length} 則</span>
           </div>
           <PagedItems items={stats.negativeAlerts} className="warningList">
@@ -259,11 +299,14 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="chartGrid" hidden={!visibleSections.facebook}>
-        <div className="panel">
-          <h3>Facebook 聲量趨勢</h3>
+        <div className="panel analyticsPanel">
+          <div className="panelTitle">
+            <span className="panelAccent blue" />
+            <h3>Facebook 聲量趨勢</h3>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={stats.facebookVolumeTrend || []}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
               <XAxis dataKey="name" />
               <YAxis allowDecimals={false} />
               <Tooltip formatter={(value) => [`${value} 則`, 'Facebook 聲量']} />
@@ -271,8 +314,11 @@ export default function Dashboard() {
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <div className="panel">
-          <h3>Facebook 情緒分析</h3>
+        <div className="panel analyticsPanel">
+          <div className="panelTitle">
+            <span className="panelAccent purple" />
+            <h3>Facebook 情緒分析</h3>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
               <Pie data={facebookSentimentCounts} dataKey="value" nameKey="name" outerRadius={90} label>
@@ -285,8 +331,11 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="chartGrid" hidden={!visibleSections.facebook}>
-        <div className="panel">
-          <h3>Facebook 熱門貼文 TOP 10</h3>
+        <div className="panel insightPanel">
+          <div className="panelTitle">
+            <span className="panelAccent blue" />
+            <h3>Facebook 熱門貼文 TOP 10</h3>
+          </div>
           <PagedItems items={stats.facebookTopPosts || []} className="warningList">
             {(post) => (
               <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
@@ -301,11 +350,14 @@ export default function Dashboard() {
           </PagedItems>
           {stats.facebookTopPosts?.length === 0 && <p className="emptyState">目前沒有 Facebook 貼文資料。</p>}
         </div>
-        <div className="panel">
-          <h3>Facebook 粉專排行</h3>
+        <div className="panel rankPanel">
+          <div className="panelTitle">
+            <span className="panelAccent blue" />
+            <h3>Facebook 粉專排行</h3>
+          </div>
           <PagedItems items={stats.facebookPageRanking || []} className="keywordRanking" ordered>
             {(page, index, globalIndex) => (
-              <li key={page.name}>
+              <li key={page.name} style={{ '--rank-width': rankWidth(page.value, maxFacebookPageCount), '--rank-color': '#1877f2' }}>
                 <strong>{globalIndex + 1}</strong>
                 <span>{page.name}</span>
                 <b>{page.value} 則</b>
@@ -316,8 +368,11 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="chartGrid" hidden={!visibleSections.dcard}>
-        <div className="panel">
-          <h3>Dcard 熱門文章排行</h3>
+        <div className="panel insightPanel">
+          <div className="panelTitle">
+            <span className="panelAccent pink" />
+            <h3>Dcard 熱門文章排行</h3>
+          </div>
           <PagedItems items={stats.dcardTopPosts || []} className="warningList">
             {(post) => (
               <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
@@ -332,11 +387,14 @@ export default function Dashboard() {
           </PagedItems>
           {stats.dcardTopPosts?.length === 0 && <p className="emptyState">目前沒有 Dcard 文章資料。</p>}
         </div>
-        <div className="panel">
-          <h3>Dcard 熱門討論關鍵字</h3>
+        <div className="panel rankPanel">
+          <div className="panelTitle">
+            <span className="panelAccent pink" />
+            <h3>Dcard 熱門討論關鍵字</h3>
+          </div>
           <PagedItems items={stats.dcardDiscussionKeywords || []} className="keywordRanking" ordered>
             {(item, index, globalIndex) => (
-              <li key={item.name}>
+              <li key={item.name} style={{ '--rank-width': rankWidth(item.value, maxDcardKeywordCount), '--rank-color': '#db2777' }}>
                 <strong>{globalIndex + 1}</strong>
                 <span>{item.name}</span>
                 <b>{item.value} 則</b>
@@ -347,8 +405,11 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="chartGrid" hidden={!visibleSections.ptt}>
-        <div className="panel">
-          <h3>PTT 熱門文章</h3>
+        <div className="panel insightPanel">
+          <div className="panelTitle">
+            <span className="panelAccent slate" />
+            <h3>PTT 熱門文章</h3>
+          </div>
           <PagedItems items={stats.pttTopPosts || []} className="warningList">
             {(post) => (
               <a key={post.id} href={post.url} target="_blank" rel="noreferrer">
@@ -359,11 +420,14 @@ export default function Dashboard() {
           </PagedItems>
           {stats.pttTopPosts?.length === 0 && <p className="emptyState">目前沒有 PTT 文章資料。</p>}
         </div>
-        <div className="panel">
-          <h3>PTT 熱門關鍵字</h3>
+        <div className="panel rankPanel">
+          <div className="panelTitle">
+            <span className="panelAccent slate" />
+            <h3>PTT 熱門關鍵字</h3>
+          </div>
           <PagedItems items={stats.pttDiscussionKeywords || []} className="keywordRanking" ordered>
             {(item, index, globalIndex) => (
-              <li key={item.name}>
+              <li key={item.name} style={{ '--rank-width': rankWidth(item.value, maxPttKeywordCount), '--rank-color': '#475569' }}>
                 <strong>{globalIndex + 1}</strong>
                 <span>{item.name}</span>
                 <b>{item.value} 則</b>
@@ -374,11 +438,14 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="chartGrid" hidden={!visibleSections.youtube}>
-        <div className="panel">
-          <h3>YouTube 熱門頻道排行</h3>
+        <div className="panel rankPanel">
+          <div className="panelTitle">
+            <span className="panelAccent red" />
+            <h3>YouTube 熱門頻道排行</h3>
+          </div>
           <PagedItems items={stats.youtubeTopChannels || []} className="keywordRanking" ordered>
             {(channel, index, globalIndex) => (
-              <li key={channel.name}>
+              <li key={channel.name} style={{ '--rank-width': rankWidth(channel.value, maxYoutubeChannelCount), '--rank-color': '#dc2626' }}>
                 <strong>{globalIndex + 1}</strong>
                 <span>{channel.name}</span>
                 <b>{channel.value} 部</b>
@@ -387,8 +454,11 @@ export default function Dashboard() {
           </PagedItems>
           {stats.youtubeTopChannels?.length === 0 && <p className="emptyState">目前沒有 YouTube 頻道資料。</p>}
         </div>
-        <div className="panel">
-          <h3>YouTube 觀看數前 10 名</h3>
+        <div className="panel insightPanel">
+          <div className="panelTitle">
+            <span className="panelAccent red" />
+            <h3>YouTube 觀看數前 10 名</h3>
+          </div>
           <PagedItems items={stats.youtubeTopVideos || []} className="warningList">
             {(video) => (
               <a key={video.id} href={video.url} target="_blank" rel="noreferrer">
@@ -432,11 +502,14 @@ export default function Dashboard() {
         />
       </section>
       <section className="chartGrid" hidden={!visibleSections.distribution}>
-        <div className="panel">
-          <h3>分類數量</h3>
+        <div className="panel analyticsPanel">
+          <div className="panelTitle">
+            <span className="panelAccent" />
+            <h3>分類數量</h3>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={stats.categoryCounts}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
               <XAxis dataKey="name" />
               <YAxis allowDecimals={false} />
               <Tooltip formatter={(value) => [`${value} 則`, '文章數']} />
@@ -444,11 +517,14 @@ export default function Dashboard() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="panel">
-          <h3>來源統計</h3>
+        <div className="panel analyticsPanel">
+          <div className="panelTitle">
+            <span className="panelAccent amber" />
+            <h3>來源統計</h3>
+          </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={sourceCounts} layout="vertical" margin={{ left: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="name" width={105} />
               <Tooltip formatter={(value) => [`${value} 則`, '文章數']} />
@@ -457,8 +533,11 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </section>
-      <section className="panel" hidden={!visibleSections.latest}>
-        <h3>{selectedKeyword ? `「${selectedKeyword}」最新文章` : '最新 10 筆文章'}</h3>
+      <section className="panel latestPanel" hidden={!visibleSections.latest}>
+        <div className="panelTitle">
+          <span className="panelAccent" />
+          <h3>{selectedKeyword ? `「${selectedKeyword}」最新文章` : '最新 10 筆文章'}</h3>
+        </div>
         <div className="cardList">
           {stats.latestArticles.map((article) => (
             <ArticleCard key={article.id} article={article} onUpdate={async (id, payload) => {

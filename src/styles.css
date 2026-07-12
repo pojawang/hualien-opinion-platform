@@ -1,6 +1,6 @@
 :root {
   color: #16211f;
-  background: #eef3f1;
+  background: #edf4f1;
   font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -102,6 +102,9 @@ a {
 }
 
 .main {
+  background:
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.12), transparent 28%),
+    linear-gradient(180deg, #edf4f1 0%, #f7faf9 100%);
   padding: 28px;
 }
 
@@ -127,6 +130,63 @@ a {
   margin: 6px 0 0;
 }
 
+.dashboardHero {
+  background:
+    linear-gradient(135deg, rgba(15, 118, 110, 0.96), rgba(18, 37, 34, 0.96)),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.16), transparent);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 20px 44px rgba(18, 37, 34, 0.16);
+  color: #fff;
+  padding: 26px;
+}
+
+.dashboardHero h2 {
+  color: #fff;
+  font-size: 34px;
+}
+
+.dashboardHero p {
+  color: #cce3df;
+}
+
+.heroEyebrow,
+.sectionKicker {
+  color: #8ee3d6;
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.heroPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.heroPills span {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  color: #f8fbfa;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 7px 11px;
+}
+
+.dashboardHero .keywordPicker span {
+  color: #d7fbf5;
+}
+
+.dashboardHero .keywordPicker select {
+  border-color: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
 .keywordPicker {
   align-items: center;
   display: grid;
@@ -148,7 +208,7 @@ a {
   background: #fff;
   border: 1px solid #dce5e2;
   border-radius: 8px;
-  box-shadow: 0 12px 28px rgba(24, 42, 38, 0.06);
+  box-shadow: 0 14px 32px rgba(24, 42, 38, 0.07);
 }
 
 .panel,
@@ -164,17 +224,90 @@ a {
 }
 
 .statCard {
+  border-top: 4px solid var(--stat-color, #0f766e);
   display: grid;
-  gap: 8px;
+  gap: 7px;
+  min-height: 142px;
   padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.statCard::after {
+  background: var(--stat-bg, rgba(15, 118, 110, 0.12));
+  border-radius: 999px;
+  content: "";
+  height: 86px;
+  position: absolute;
+  right: -30px;
+  top: -36px;
+  width: 86px;
+}
+
+.statCard.teal,
+.statCard {
+  --stat-color: #0f766e;
+  --stat-bg: rgba(15, 118, 110, 0.13);
+}
+
+.statCard.green,
+.statCard.emerald {
+  --stat-color: #059669;
+  --stat-bg: rgba(5, 150, 105, 0.13);
+}
+
+.statCard.amber {
+  --stat-color: #d97706;
+  --stat-bg: rgba(217, 119, 6, 0.14);
+}
+
+.statCard.red {
+  --stat-color: #b91c1c;
+  --stat-bg: rgba(185, 28, 28, 0.12);
+}
+
+.statCard.blue {
+  --stat-color: #2563eb;
+  --stat-bg: rgba(37, 99, 235, 0.12);
+}
+
+.statCard.purple {
+  --stat-color: #7c3aed;
+  --stat-bg: rgba(124, 58, 237, 0.12);
+}
+
+.statCard.pink {
+  --stat-color: #db2777;
+  --stat-bg: rgba(219, 39, 119, 0.12);
+}
+
+.statCard.slate {
+  --stat-color: #475569;
+  --stat-bg: rgba(71, 85, 105, 0.12);
+}
+
+.statIcon {
+  background: var(--stat-color, #0f766e);
+  border-radius: 999px;
+  height: 9px;
+  width: 34px;
 }
 
 .statCard span {
   color: #5e6d69;
+  font-weight: 800;
 }
 
 .statCard strong {
-  font-size: 30px;
+  color: #10201d;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.statCard small {
+  color: #6f7c78;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .chartGrid {
@@ -186,6 +319,8 @@ a {
 .dashboardDisplayControls {
   display: grid;
   gap: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
 }
 
 .dashboardDisplayControls .secondaryButton {
@@ -202,11 +337,15 @@ a {
 
 .dashboardCheckboxes label {
   align-items: center;
+  background: #f5faf8;
+  border: 1px solid #dcebe7;
+  border-radius: 999px;
   color: #384743;
   cursor: pointer;
   display: inline-flex;
   gap: 7px;
   min-height: 32px;
+  padding: 6px 11px 6px 8px;
 }
 
 .dashboardCheckboxes input {
@@ -217,7 +356,8 @@ a {
 }
 
 .summaryPanel {
-  border-left: 4px solid #0f766e;
+  background: linear-gradient(135deg, #ffffff 0%, #f1fbf8 100%);
+  border-left: 5px solid #0f766e;
 }
 
 .summaryPanel p {
@@ -233,13 +373,90 @@ a {
   justify-content: space-between;
 }
 
-.sectionHeading span {
+.sectionHeading > span,
+.sectionHeading div > span:not(.sectionKicker) {
   background: #eef8f6;
   border-radius: 999px;
   color: #0f766e;
   font-size: 13px;
   font-weight: 700;
   padding: 5px 9px;
+}
+
+.riskBadge {
+  background: #ecfdf5;
+  border-radius: 999px;
+  color: #047857;
+  font-size: 14px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.riskBadge.high {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.panelTitle {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.panelTitle h3 {
+  margin: 0;
+}
+
+.panelAccent {
+  background: #0f766e;
+  border-radius: 999px;
+  display: inline-block;
+  height: 22px;
+  width: 6px;
+}
+
+.panelAccent.amber {
+  background: #d97706;
+}
+
+.panelAccent.red {
+  background: #b91c1c;
+}
+
+.panelAccent.blue {
+  background: #2563eb;
+}
+
+.panelAccent.purple {
+  background: #7c3aed;
+}
+
+.panelAccent.pink {
+  background: #db2777;
+}
+
+.panelAccent.slate {
+  background: #475569;
+}
+
+.analyticsPanel,
+.insightPanel,
+.rankPanel,
+.latestPanel {
+  position: relative;
+}
+
+.analyticsPanel::before,
+.insightPanel::before,
+.rankPanel::before {
+  background: linear-gradient(90deg, rgba(15, 118, 110, 0.10), transparent);
+  content: "";
+  height: 3px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
 }
 
 .keywordRanking {
@@ -257,6 +474,19 @@ a {
   gap: 12px;
   grid-template-columns: 28px 1fr auto;
   min-height: 42px;
+  padding: 8px 0;
+  position: relative;
+}
+
+.keywordRanking li::before {
+  background: linear-gradient(90deg, var(--rank-color, #0f766e), rgba(15, 118, 110, 0.08));
+  border-radius: 999px;
+  bottom: 7px;
+  content: "";
+  height: 4px;
+  left: 40px;
+  position: absolute;
+  width: var(--rank-width, 8%);
 }
 
 .keywordRanking li:last-child {
@@ -265,6 +495,7 @@ a {
 
 .keywordRanking strong {
   color: #0f766e;
+  font-size: 18px;
 }
 
 .keywordRanking b {
@@ -273,7 +504,8 @@ a {
 }
 
 .warningPanel {
-  border-top: 3px solid #b91c1c;
+  background: linear-gradient(180deg, #fff 0%, #fff7f7 100%);
+  border-top: 4px solid #b91c1c;
 }
 
 .warningList {
@@ -284,7 +516,16 @@ a {
   border-bottom: 1px solid #e5eeeb;
   display: grid;
   gap: 5px;
-  padding: 11px 0;
+  padding: 12px 0;
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+
+.warningList a:hover {
+  transform: translateX(3px);
+}
+
+.warningList span {
+  line-height: 1.5;
 }
 
 .warningList a:last-child {
@@ -307,6 +548,8 @@ a {
 }
 
 .paginationControls button {
+  background: #f5faf8;
+  color: #0f766e;
   min-width: 72px;
   padding: 7px 10px;
 }
