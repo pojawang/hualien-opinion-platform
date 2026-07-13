@@ -200,7 +200,7 @@ function buildGoogleReviewStats(articles) {
 
 function buildFacebookStats(articles) {
   const posts = articles.filter((item) => (
-    item.platform === 'facebook_page'
+    ['facebook_page', 'facebook_group'].includes(item.platform)
     && item.post_id
     && isFacebookPostUrl(item.url)
   ));
@@ -216,7 +216,7 @@ function buildFacebookStats(articles) {
     const publishedKey = dateKey(post.published_at || post.created_at);
     const day = trendMap.get(publishedKey);
     if (day) day.value += 1;
-    const pageName = post.source || 'Facebook 粉專';
+    const pageName = post.source || (post.platform === 'facebook_group' ? 'Facebook 公開社團' : 'Facebook 粉專');
     const current = pageMap.get(pageName) || { name: pageName, value: 0, engagement: 0 };
     current.value += 1;
     current.engagement += (Number(post.like_count) || 0) + (Number(post.comment_count) || 0) + (Number(post.share_count) || 0);
@@ -277,7 +277,7 @@ export async function handler(event) {
       supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword'),
       supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000),
       supabase.from('articles').select('*').eq('sentiment', 'negative').gte('created_at', negativeCutoff.toISOString()).order('created_at', { ascending: false }).limit(500),
-      supabase.from('articles').select('*').eq('platform', 'facebook_page').not('post_id', 'is', null).gte('created_at', facebookCutoff.toISOString()).order('created_at', { ascending: false }).limit(500)
+      supabase.from('articles').select('*').in('platform', ['facebook_page', 'facebook_group']).not('post_id', 'is', null).gte('created_at', facebookCutoff.toISOString()).order('created_at', { ascending: false }).limit(500)
     ]);
     if (articleResult.error) throw articleResult.error;
     if (keywordResult.error) throw keywordResult.error;

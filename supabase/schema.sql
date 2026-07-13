@@ -76,6 +76,8 @@ create table if not exists facebook_pages (
   id uuid primary key default gen_random_uuid(),
   page_name text,
   page_url text unique not null,
+  source_kind text not null default 'page' check (source_kind in ('page', 'public_group')),
+  collector text not null default 'playwright' check (collector in ('apify', 'playwright')),
   category text default '其他',
   enabled boolean default true,
   last_fetch_at timestamptz,
@@ -132,7 +134,9 @@ create index if not exists idx_articles_view_count on articles(view_count desc) 
 create index if not exists idx_articles_dcard_engagement on articles((like_count + comment_count) desc) where platform = 'dcard';
 create index if not exists idx_articles_google_reviews_rating on articles(rating desc) where platform = 'google_reviews';
 create index if not exists idx_articles_facebook_hotness on articles(hotness_score desc) where platform = 'facebook_page';
+create index if not exists idx_articles_facebook_all_hotness on articles(hotness_score desc) where platform in ('facebook_page', 'facebook_group');
 create index if not exists idx_facebook_pages_enabled on facebook_pages(enabled);
+create index if not exists idx_facebook_pages_source_kind on facebook_pages(source_kind);
 create index if not exists idx_posts_source on posts(source);
 create index if not exists idx_posts_published_at on posts(published_at desc);
 create index if not exists idx_posts_engagement on posts((like_count + comment_count) desc) where source = 'dcard';

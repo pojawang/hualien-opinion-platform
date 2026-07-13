@@ -268,8 +268,8 @@ const errors = [];
 
 try {
   for (const configuredPage of configuredPages || []) {
-    if (/facebook\.com\/groups\//i.test(configuredPage.page_url)) {
-      errors.push(`${configuredPage.page_name || configuredPage.page_url}: 不支援 Facebook 社團`);
+    if (configuredPage.source_kind === 'public_group' || /facebook\.com\/groups\//i.test(configuredPage.page_url)) {
+      errors.push(`${configuredPage.page_name || configuredPage.page_url}: Playwright 備援不支援 Facebook 公開社團，請設定 Apify 社團 Actor`);
       continue;
     }
     const page = await context.newPage();
@@ -289,7 +289,7 @@ try {
           hotness_score: analysis.hotness_score, analysis_keywords: analysis.keywords, ai_analyzed: analysis.ai_analyzed
         });
       }
-      await supabase.from('facebook_pages').update({ last_fetch_at: new Date().toISOString() }).eq('id', configuredPage.id);
+      await supabase.from('facebook_pages').update({ last_fetch_at: new Date().toISOString(), collector: 'playwright' }).eq('id', configuredPage.id);
       console.log(`${configuredPage.page_name || configuredPage.page_url}: ${posts.length} posts`);
     } catch (error) {
       errors.push(`${configuredPage.page_name || configuredPage.page_url}: ${error.message}`);

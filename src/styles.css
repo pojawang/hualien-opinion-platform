@@ -564,7 +564,7 @@ a {
 .facebookPageForm {
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
 }
 
 .userCreateForm {
@@ -610,18 +610,23 @@ a {
   border-bottom: 1px solid #e5eeeb;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(240px, 1fr) 130px 180px auto auto;
+  grid-template-columns: minmax(240px, 1fr) 160px 130px 180px auto auto;
   padding: 12px;
 }
 
 .facebookPageRow.readOnly {
-  grid-template-columns: minmax(240px, 1fr) 130px 180px;
+  grid-template-columns: minmax(240px, 1fr) 160px 130px 180px;
 }
 
 .facebookPageRow > div {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+
+.facebookPageRow small {
+  color: #5e6d69;
+  font-size: 13px;
 }
 
 .facebookPageRow a {
