@@ -8,6 +8,31 @@ import {
 } from './_utils.js';
 
 const RECENT_DAYS = 7;
+const DEFAULT_FACEBOOK_KEYWORDS = [
+  '花蓮',
+  '花蓮旅遊',
+  '花蓮美食',
+  '花蓮住宿',
+  '花蓮景點',
+  '花蓮活動',
+  '花蓮交通',
+  '花蓮地震',
+  '花蓮颱風',
+  '花蓮災情',
+  '花蓮縣',
+  '花蓮市',
+  '太魯閣',
+  '七星潭',
+  '東大門夜市',
+  '鯉魚潭',
+  '瑞穗',
+  '光復',
+  '玉里',
+  '壽豐',
+  '吉安',
+  '新城',
+  '洄瀾'
+];
 
 function isGroupUrl(value = '') {
   return /facebook\.com\/groups\//i.test(String(value));
@@ -85,11 +110,70 @@ function configuredCategory(source, category) {
   return category;
 }
 
-function findSourceForItem(item, sources) {
-  const rawUrl = textValue(item.pageUrl, item.profileUrl, item.facebookUrl, item.groupUrl, item.url);
-  return sources.find((source) => rawUrl && rawUrl.includes(new URL(source.page_url).pathname.split('/').filter(Boolean)[0]))
-    || sources.find((source) => textValue(item.pageName, item.profileName, item.groupName, item.author, item.name).includes(source.page_name || ''))
+function sourceIdentifier(value = '') {
+  try {
+    const parsed = new URL(value, 'https://www.facebook.com');
+    const pathParts = parsed.pathname.split('/').filter(Boolean);
+    const groupIndex = pathParts.findIndex((part) => part.toLowerCase() === 'groups');
+    if (groupIndex >= 0 && pathParts[groupIndex + 1]) return pathParts[groupIndex + 1].toLowerCase();
+    const id = parsed.searchParams.get('id');
+    if (id) return id.toLowerCase();
+    return (pathParts[0] || '').toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function itemUrls(item) {
+  return [
+    item.postUrl,
+    item.url,
+    item.permalink,
+    item.link,
+    item.facebookUrl,
+    item.pageUrl,
+    item.profileUrl,
+    item.groupUrl
+  ].map((value) => normalizeFacebookUrl(textValue(value))).filter(Boolean);
+}
+
+function findSourceForItem(item, sources = []) {
+  const urls = itemUrls(item);
+  const itemIdentifiers = new Set(urls.map(sourceIdentifier).filter(Boolean));
+  const sourceByIdentifier = new Map(
+    sources
+      .map((source) => [sourceIdentifier(source.page_url), source])
+      .filter(([key]) => key)
+  );
+
+  for (const identifier of itemIdentifiers) {
+    const source = sourceByIdentifier.get(identifier);
+    if (source) return source;
+  }
+
+  const names = textValue(item.pageName, item.profileName, item.groupName, item.author, item.name);
+  return sources.find((source) => source.page_name && names.includes(source.page_name))
+    || sources.find((source) => urls.some((url) => preferredFacebookName(url) === source.page_name))
     || sources[0];
+}
+
+function matchesFacebookKeywords(title, content, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
+  const text = `${title || ''} ${content || ''}`.replace(/\s+/g, '').toLowerCase();
+  return keywords.some((keyword) => {
+    const normalized = String(keyword || '').replace(/\s+/g, '').toLowerCase();
+    return normalized && text.includes(normalized);
+  });
+}
+
+async function facebookKeywords(supabase) {
+  const { data, error } = await supabase
+    .from('keywords')
+    .select('keyword')
+    .eq('enabled', true);
+  if (error) return DEFAULT_FACEBOOK_KEYWORDS;
+  return [...new Set([...(data || []).map((item) => item.keyword), ...DEFAULT_FACEBOOK_KEYWORDS])]
+    .map((keyword) => String(keyword || '').trim())
+    .filter(Boolean);
 }
 
 export function apifyConfigured() {
@@ -193,7 +277,7 @@ async function fetchDatasetItems(datasetId) {
   return Array.isArray(payload) ? payload : [];
 }
 
-function toArticleRow(item, sources, type) {
+function toArticleRow(item, sources, type, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
   const source = findSourceForItem(item, sources);
   const content = textValue(
     item.message,
@@ -206,6 +290,7 @@ function toArticleRow(item, sources, type) {
   const title = textValue(item.title, content.split('\n')[0], `${source?.page_name || 'Facebook'} 貼文`).slice(0, 120);
   const url = normalizeFacebookUrl(textValue(item.postUrl, item.url, item.permalink, item.link, item.facebookUrl));
   if (!url || !content) return null;
+  if (!matchesFacebookKeywords(title, content, keywords)) return null;
 
   const published = dateValue(item.created_time, item.createdTime, item.time, item.date, item.timestamp, item.published_at);
   const cutoff = Date.now() - RECENT_DAYS * 86400000;
@@ -340,6 +425,7 @@ export async function syncFacebookApifyRuns() {
     .select('*')
     .eq('enabled', true);
   if (sourceError) throw sourceError;
+  const keywords = await facebookKeywords(supabase);
 
   let matched = 0;
   let upserted = 0;
@@ -368,7 +454,7 @@ export async function syncFacebookApifyRuns() {
       const items = datasetId ? await fetchDatasetItems(datasetId) : [];
       const sources = (configuredSources || []).filter((source) => (storedRun.source_ids || []).includes(source.id));
       const type = storedRun.source_kind === 'public_group' ? 'group' : 'page';
-      const rows = items.map((item) => toArticleRow(item, sources, type)).filter(Boolean);
+      const rows = items.map((item) => toArticleRow(item, sources, type, keywords)).filter(Boolean);
       const changed = await upsertArticles(rows);
       matched += rows.length;
       upserted += changed;
@@ -416,6 +502,7 @@ export async function collectFacebookWithApify() {
     .select('*')
     .eq('enabled', true);
   if (error) throw error;
+  const keywords = await facebookKeywords(supabase);
 
   const pages = (configuredSources || []).filter((source) => !isGroupUrl(source.page_url));
   const groups = (configuredSources || []).filter((source) => isGroupUrl(source.page_url));
@@ -428,7 +515,7 @@ export async function collectFacebookWithApify() {
     } else {
       try {
         const items = await runActor(process.env.APIFY_FACEBOOK_PAGES_ACTOR_ID, pages, '粉專');
-        rows.push(...items.map((item) => toArticleRow(item, pages, 'page')).filter(Boolean));
+        rows.push(...items.map((item) => toArticleRow(item, pages, 'page', keywords)).filter(Boolean));
       } catch (err) {
         errors.push(err.message);
       }
@@ -441,7 +528,7 @@ export async function collectFacebookWithApify() {
     } else {
       try {
         const items = await runActor(process.env.APIFY_FACEBOOK_GROUPS_ACTOR_ID, groups, '公開社團');
-        rows.push(...items.map((item) => toArticleRow(item, groups, 'group')).filter(Boolean));
+        rows.push(...items.map((item) => toArticleRow(item, groups, 'group', keywords)).filter(Boolean));
       } catch (err) {
         errors.push(err.message);
       }

@@ -1,5 +1,31 @@
 import { guard, json, supabaseAdmin } from './_utils.js';
 
+const DEFAULT_FACEBOOK_KEYWORDS = [
+  '花蓮',
+  '花蓮旅遊',
+  '花蓮美食',
+  '花蓮住宿',
+  '花蓮景點',
+  '花蓮活動',
+  '花蓮交通',
+  '花蓮地震',
+  '花蓮颱風',
+  '花蓮災情',
+  '花蓮縣',
+  '花蓮市',
+  '太魯閣',
+  '七星潭',
+  '東大門夜市',
+  '鯉魚潭',
+  '瑞穗',
+  '光復',
+  '玉里',
+  '壽豐',
+  '吉安',
+  '新城',
+  '洄瀾'
+];
+
 function countBy(items, key, fallback = '其他') {
   const map = new Map();
   for (const item of items) {
@@ -65,6 +91,38 @@ function matchesKeyword(article, keyword) {
   }
 
   return false;
+}
+
+function articleRelevanceText(article) {
+  return `${article.title || ''} ${article.content || ''} ${article.snippet || ''} ${article.summary || ''}`.replace(/\s+/g, '').toLowerCase();
+}
+
+function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
+  const text = articleRelevanceText(article);
+  return keywords.some((keyword) => {
+    const normalized = String(keyword || '').replace(/\s+/g, '').toLowerCase();
+    return normalized && text.includes(normalized);
+  });
+}
+
+function isFacebookPlatform(platform) {
+  return ['facebook_page', 'facebook_group'].includes(platform);
+}
+
+function preferredFacebookName(url = '') {
+  const text = String(url || '');
+  const rules = [
+    ['265344726961368', '花蓮人Hualien'],
+    ['255935524557211', '花蓮大小事'],
+    ['249927231705630', '花蓮同鄉會'],
+    ['833233640557210', '花蓮爆料王'],
+    ['100063596289388', '今日花蓮']
+  ];
+  return rules.find(([key]) => text.includes(key))?.[1] || '';
+}
+
+function facebookDisplaySource(article) {
+  return preferredFacebookName(article.url) || article.source || (article.platform === 'facebook_group' ? 'Facebook 公開社團' : 'Facebook 粉專');
 }
 
 function isFacebookPostUrl(value) {
@@ -216,7 +274,7 @@ function buildFacebookStats(articles) {
     const publishedKey = dateKey(post.published_at || post.created_at);
     const day = trendMap.get(publishedKey);
     if (day) day.value += 1;
-    const pageName = post.source || (post.platform === 'facebook_group' ? 'Facebook 公開社團' : 'Facebook 粉專');
+    const pageName = facebookDisplaySource(post);
     const current = pageMap.get(pageName) || { name: pageName, value: 0, engagement: 0 };
     current.value += 1;
     current.engagement += (Number(post.like_count) || 0) + (Number(post.comment_count) || 0) + (Number(post.share_count) || 0);
@@ -234,7 +292,8 @@ function buildFacebookStats(articles) {
         const scoreB = Number(b.hotness_score) || (Number(b.like_count) || 0) + (Number(b.comment_count) || 0) * 2 + (Number(b.share_count) || 0) * 3;
         return scoreB - scoreA;
       })
-      .slice(0, 10),
+      .slice(0, 10)
+      .map((post) => ({ ...post, source: facebookDisplaySource(post) })),
     pageRanking: Array.from(pageMap.values())
       .sort((a, b) => b.value - a.value || b.engagement - a.engagement)
       .slice(0, 10)
@@ -286,7 +345,11 @@ export async function handler(event) {
     if (facebookResult.error) throw facebookResult.error;
 
     const keywords = (keywordResult.data || []).map((item) => item.keyword);
-    const allArticles = articleResult.data || [];
+    const relevanceKeywords = [...new Set([...keywords, ...DEFAULT_FACEBOOK_KEYWORDS])]
+      .map((keyword) => String(keyword || '').trim())
+      .filter(Boolean);
+    const isRelevantArticle = (item) => !isFacebookPlatform(item.platform) || matchesTextKeyword(item, relevanceKeywords);
+    const allArticles = (articleResult.data || []).filter(isRelevantArticle);
     const articles = selectedKeyword
       ? allArticles.filter((item) => matchesKeyword(item, selectedKeyword))
       : allArticles;
@@ -295,11 +358,11 @@ export async function handler(event) {
       ? socialPosts.filter((item) => matchesKeyword(item, selectedKeyword))
       : socialPosts;
     const negativeArticles = selectedKeyword
-      ? (negativeResult.data || []).filter((item) => matchesKeyword(item, selectedKeyword))
-      : negativeResult.data || [];
+      ? (negativeResult.data || []).filter((item) => isRelevantArticle(item) && matchesKeyword(item, selectedKeyword))
+      : (negativeResult.data || []).filter(isRelevantArticle);
     const facebookArticles = selectedKeyword
-      ? (facebookResult.data || []).filter((item) => matchesKeyword(item, selectedKeyword))
-      : facebookResult.data || [];
+      ? (facebookResult.data || []).filter((item) => isRelevantArticle(item) && matchesKeyword(item, selectedKeyword))
+      : (facebookResult.data || []).filter(isRelevantArticle);
     const todayArticles = articles.filter((item) => dateKey(item.created_at) === today);
 
     if (params.report === 'daily') {
