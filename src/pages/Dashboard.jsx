@@ -522,11 +522,11 @@ export default function Dashboard() {
             <span className="panelAccent amber" />
             <h3>來源統計</h3>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={sourceCounts} layout="vertical" margin={{ left: 12 }}>
+          <ResponsiveContainer width="100%" height={Math.max(280, sourceCounts.length * 42)}>
+            <BarChart data={sourceCounts} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 28 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
               <XAxis type="number" allowDecimals={false} />
-              <YAxis type="category" dataKey="name" width={105} />
+              <YAxis type="category" dataKey="name" width={140} interval={0} tickMargin={8} />
               <Tooltip formatter={(value) => [`${value} 則`, '文章數']} />
               <Bar dataKey="value" fill="#d97706" />
             </BarChart>
