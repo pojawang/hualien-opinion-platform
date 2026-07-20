@@ -1,4 +1,4 @@
-import { apifyConfigured, collectFacebookWithApify } from './_facebookApify.js';
+import { apifyConfigured, startFacebookApifyRuns } from './_facebookApify.js';
 import { isAdminRequest, json } from './_utils.js';
 
 async function triggerPlaywrightFallback() {
@@ -40,18 +40,18 @@ export async function handler(event) {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
     if (apifyConfigured()) {
-      const result = await collectFacebookWithApify();
-      if (result.errors?.some((message) => message.includes('粉專'))) {
-        const fallback = await triggerPlaywrightFallback();
+      const result = await startFacebookApifyRuns();
+      if (result.started > 0) {
         return json(202, {
           ...result,
-          fallback,
-          message: `Apify 已處理可用來源，另已啟動 Playwright 備援。新增或更新 ${result.upserted || 0} 則。`
+          message: `Apify Facebook 巡查已啟動 ${result.started} 個任務，系統會自動檢查並匯入結果。`
         });
       }
-      return json(200, {
+      const fallback = await triggerPlaywrightFallback();
+      return json(202, {
         ...result,
-        message: `Apify Facebook 巡查完成：找到 ${result.matched || 0} 則，新增或更新 ${result.upserted || 0} 則。`
+        fallback,
+        message: fallback.message
       });
     }
 

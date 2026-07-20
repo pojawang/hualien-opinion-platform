@@ -1,4 +1,5 @@
 import { guard, isAdminRequest, json, parseBody, supabaseAdmin } from './_utils.js';
+import { preferredFacebookName } from './_facebookApify.js';
 
 function normalizeFacebookUrl(value) {
   try {
@@ -19,6 +20,8 @@ function sourceKind(url) {
 }
 
 function initialName(url) {
+  const preferred = preferredFacebookName(url);
+  if (preferred) return preferred;
   try {
     const parsed = new URL(url);
     const parts = parsed.pathname.split('/').filter(Boolean);

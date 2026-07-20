@@ -23,6 +23,7 @@ export default function FacebookPages() {
   const [pageUrl, setPageUrl] = useState('');
   const [sourceKind, setSourceKind] = useState('page');
   const [collecting, setCollecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -85,10 +86,22 @@ export default function FacebookPages() {
       const result = await apiFetch('trigger-facebook-collector', { method: 'POST' });
       setMessage(result.message || 'Facebook 巡查已啟動。');
       await load();
+      if (result.provider === 'apify' && result.started > 0) {
+        setSyncing(true);
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 8000));
+          const syncResult = await apiFetch('sync-facebook-apify-runs', { method: 'POST' });
+          setMessage(syncResult.message || '正在同步 Apify 巡查結果。');
+          await load();
+          if (!syncResult.pending) break;
+        }
+        setSyncing(false);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setCollecting(false);
+      setSyncing(false);
     }
   }
 
@@ -100,7 +113,7 @@ export default function FacebookPages() {
           <p>Apify 優先巡查公開粉專與公開社團，Playwright 保留為粉專備援。</p>
         </div>
         {canManage && <button type="button" onClick={collectNow} disabled={collecting}>
-          {collecting ? '巡查中...' : '開始巡查'}
+          {syncing ? '同步結果中...' : collecting ? '啟動巡查中...' : '開始巡查'}
         </button>}
       </header>
       {error && <div className="alert">{error}</div>}

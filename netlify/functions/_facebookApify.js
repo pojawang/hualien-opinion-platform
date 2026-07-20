@@ -96,15 +96,25 @@ export function apifyConfigured() {
   return Boolean(process.env.APIFY_TOKEN && (process.env.APIFY_FACEBOOK_PAGES_ACTOR_ID || process.env.APIFY_FACEBOOK_GROUPS_ACTOR_ID));
 }
 
-async function runActor(actorId, sources, type) {
-  const token = process.env.APIFY_TOKEN;
-  const timeout = Number(process.env.APIFY_FACEBOOK_TIMEOUT_SECS || 120);
+export function preferredFacebookName(url = '') {
+  const text = String(url);
+  const rules = [
+    ['265344726961368', '花蓮人Hualien'],
+    ['255935524557211', '花蓮大小事'],
+    ['249927231705630', '花蓮同鄉會'],
+    ['833233640557210', '花蓮爆料王'],
+    ['100063596289388', '今日花蓮']
+  ];
+  return rules.find(([key]) => text.includes(key))?.[1] || '';
+}
+
+function buildActorInput(sources) {
   const maxPosts = Number(process.env.APIFY_FACEBOOK_MAX_POSTS || 10);
   const baseInput = process.env.APIFY_FACEBOOK_INPUT_JSON
     ? JSON.parse(process.env.APIFY_FACEBOOK_INPUT_JSON)
     : {};
   const urls = sources.map((source) => source.page_url);
-  const input = {
+  return {
     ...baseInput,
     startUrls: urls.map((url) => ({ url })),
     urls,
@@ -112,6 +122,12 @@ async function runActor(actorId, sources, type) {
     resultsLimit: maxPosts,
     postsLimit: maxPosts
   };
+}
+
+async function runActor(actorId, sources, type) {
+  const token = process.env.APIFY_TOKEN;
+  const timeout = Number(process.env.APIFY_FACEBOOK_TIMEOUT_SECS || 20);
+  const input = buildActorInput(sources);
 
   const response = await fetch(
     `https://api.apify.com/v2/acts/${actorPath(actorId)}/run-sync-get-dataset-items?timeout=${timeout}&clean=true&format=json`,
@@ -131,6 +147,48 @@ async function runActor(actorId, sources, type) {
     throw new Error(`Apify ${type} 執行失敗：${response.status}${detail ? ` ${detail.slice(0, 180)}` : ''}`);
   }
 
+  const payload = await response.json();
+  return Array.isArray(payload) ? payload : [];
+}
+
+async function startActor(actorId, sources, type) {
+  const token = process.env.APIFY_TOKEN;
+  const response = await fetch(
+    `https://api.apify.com/v2/acts/${actorPath(actorId)}/runs`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Hualien-Opinion-Platform'
+      },
+      body: JSON.stringify(buildActorInput(sources))
+    }
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Apify ${type} 啟動失敗：${response.status}${detail ? ` ${detail.slice(0, 180)}` : ''}`);
+  }
+
+  const payload = await response.json();
+  return payload.data || payload;
+}
+
+async function fetchRun(runId) {
+  const response = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${encodeURIComponent(process.env.APIFY_TOKEN)}`, {
+    headers: { 'User-Agent': 'Hualien-Opinion-Platform' }
+  });
+  if (!response.ok) throw new Error(`Apify run 狀態讀取失敗：${response.status}`);
+  const payload = await response.json();
+  return payload.data || payload;
+}
+
+async function fetchDatasetItems(datasetId) {
+  const response = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${encodeURIComponent(process.env.APIFY_TOKEN)}&clean=true&format=json`, {
+    headers: { 'User-Agent': 'Hualien-Opinion-Platform' }
+  });
+  if (!response.ok) throw new Error(`Apify dataset 讀取失敗：${response.status}`);
   const payload = await response.json();
   return Array.isArray(payload) ? payload : [];
 }
@@ -217,6 +275,136 @@ async function upsertArticles(rows) {
   }
 
   return changed;
+}
+
+export async function startFacebookApifyRuns() {
+  if (!process.env.APIFY_TOKEN) throw new Error('APIFY_TOKEN 尚未設定');
+
+  const supabase = supabaseAdmin();
+  const { data: configuredSources, error } = await supabase
+    .from('facebook_pages')
+    .select('*')
+    .eq('enabled', true);
+  if (error) throw error;
+
+  const pages = (configuredSources || []).filter((source) => !isGroupUrl(source.page_url));
+  const groups = (configuredSources || []).filter((source) => isGroupUrl(source.page_url));
+  const runs = [];
+  const errors = [];
+
+  async function startFor(type, actorId, sources) {
+    if (sources.length === 0) return;
+    if (!actorId) {
+      errors.push(type === 'page' ? 'Apify 粉專 Actor 尚未設定' : 'Apify 公開社團 Actor 尚未設定');
+      return;
+    }
+    const run = await startActor(actorId, sources, type === 'page' ? '粉專' : '公開社團');
+    const row = {
+      actor_run_id: run.id,
+      dataset_id: run.defaultDatasetId || null,
+      source_kind: type,
+      source_ids: sources.map((source) => source.id),
+      status: run.status || 'RUNNING'
+    };
+    const { error: insertError } = await supabase.from('facebook_apify_runs').upsert(row, { onConflict: 'actor_run_id' });
+    if (insertError) throw insertError;
+    runs.push(row);
+  }
+
+  await startFor('page', process.env.APIFY_FACEBOOK_PAGES_ACTOR_ID, pages);
+  await startFor('public_group', process.env.APIFY_FACEBOOK_GROUPS_ACTOR_ID, groups);
+
+  return {
+    ok: errors.length === 0,
+    provider: 'apify',
+    started: runs.length,
+    runs,
+    errors
+  };
+}
+
+export async function syncFacebookApifyRuns() {
+  if (!process.env.APIFY_TOKEN) throw new Error('APIFY_TOKEN 尚未設定');
+
+  const supabase = supabaseAdmin();
+  const { data: runs, error } = await supabase
+    .from('facebook_apify_runs')
+    .select('*')
+    .in('status', ['READY', 'RUNNING'])
+    .order('created_at', { ascending: true })
+    .limit(10);
+  if (error) throw error;
+
+  const { data: configuredSources, error: sourceError } = await supabase
+    .from('facebook_pages')
+    .select('*')
+    .eq('enabled', true);
+  if (sourceError) throw sourceError;
+
+  let matched = 0;
+  let upserted = 0;
+  let finished = 0;
+  const errors = [];
+
+  for (const storedRun of runs || []) {
+    try {
+      const run = await fetchRun(storedRun.actor_run_id);
+      if (!['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT'].includes(run.status)) {
+        await supabase.from('facebook_apify_runs').update({ status: run.status || 'RUNNING' }).eq('id', storedRun.id);
+        continue;
+      }
+
+      if (run.status !== 'SUCCEEDED') {
+        await supabase.from('facebook_apify_runs').update({
+          status: run.status,
+          error_message: run.statusMessage || run.exitCode || 'Apify run 未成功'
+        }).eq('id', storedRun.id);
+        errors.push(`Apify ${storedRun.source_kind}：${run.status}`);
+        finished += 1;
+        continue;
+      }
+
+      const datasetId = run.defaultDatasetId || storedRun.dataset_id;
+      const items = datasetId ? await fetchDatasetItems(datasetId) : [];
+      const sources = (configuredSources || []).filter((source) => (storedRun.source_ids || []).includes(source.id));
+      const type = storedRun.source_kind === 'public_group' ? 'group' : 'page';
+      const rows = items.map((item) => toArticleRow(item, sources, type)).filter(Boolean);
+      const changed = await upsertArticles(rows);
+      matched += rows.length;
+      upserted += changed;
+      finished += 1;
+
+      if (sources.length > 0) {
+        await supabase.from('facebook_pages').update({
+          last_fetch_at: new Date().toISOString(),
+          collector: 'apify'
+        }).in('id', sources.map((source) => source.id));
+      }
+      await supabase.from('facebook_apify_runs').update({
+        status: 'IMPORTED',
+        dataset_id: datasetId,
+        imported_at: new Date().toISOString()
+      }).eq('id', storedRun.id);
+    } catch (err) {
+      errors.push(err.message);
+      await supabase.from('facebook_apify_runs').update({
+        status: 'ERROR',
+        error_message: err.message
+      }).eq('id', storedRun.id);
+    }
+  }
+
+  const pending = (runs || []).length - finished;
+  return {
+    ok: errors.length === 0,
+    provider: 'apify',
+    checked: runs?.length || 0,
+    finished,
+    pending: Math.max(0, pending),
+    matched,
+    upserted,
+    errors
+  };
 }
 
 export async function collectFacebookWithApify() {

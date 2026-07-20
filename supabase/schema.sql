@@ -84,6 +84,19 @@ create table if not exists facebook_pages (
   created_at timestamptz default now()
 );
 
+create table if not exists facebook_apify_runs (
+  id uuid primary key default gen_random_uuid(),
+  actor_run_id text unique not null,
+  dataset_id text,
+  source_kind text not null default 'page' check (source_kind in ('page', 'public_group')),
+  source_ids uuid[] not null default '{}',
+  status text not null default 'READY',
+  error_message text,
+  imported_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 create table if not exists broadcasts (
   id uuid primary key default gen_random_uuid(),
   article_id uuid references articles(id) on delete set null,
@@ -118,10 +131,11 @@ alter table keywords enable row level security;
 alter table sources enable row level security;
 alter table articles enable row level security;
 alter table facebook_pages enable row level security;
+alter table facebook_apify_runs enable row level security;
 alter table broadcasts enable row level security;
 alter table posts enable row level security;
 
-revoke all privileges on table users, keywords, sources, articles, facebook_pages, broadcasts, posts
+revoke all privileges on table users, keywords, sources, articles, facebook_pages, facebook_apify_runs, broadcasts, posts
   from anon, authenticated;
 
 create index if not exists idx_articles_status on articles(status);
@@ -137,6 +151,7 @@ create index if not exists idx_articles_facebook_hotness on articles(hotness_sco
 create index if not exists idx_articles_facebook_all_hotness on articles(hotness_score desc) where platform in ('facebook_page', 'facebook_group');
 create index if not exists idx_facebook_pages_enabled on facebook_pages(enabled);
 create index if not exists idx_facebook_pages_source_kind on facebook_pages(source_kind);
+create index if not exists idx_facebook_apify_runs_status on facebook_apify_runs(status);
 create index if not exists idx_posts_source on posts(source);
 create index if not exists idx_posts_published_at on posts(published_at desc);
 create index if not exists idx_posts_engagement on posts((like_count + comment_count) desc) where source = 'dcard';
