@@ -105,6 +105,46 @@ function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
   });
 }
 
+function isPromotionalArticle(article) {
+  const text = articleRelevanceText(article);
+  const platform = String(article.platform || '');
+  const promotionalPatterns = [
+    /優惠/,
+    /特價/,
+    /團購/,
+    /代購/,
+    /訂購/,
+    /預約電話/,
+    /買一送一/,
+    /抽獎/,
+    /贈送/,
+    /交友/,
+    /徵友/,
+    /單身/,
+    /加賴/,
+    /line[:：]?/,
+    /[0-9]+元/,
+    /\$[0-9]+/
+  ];
+  const publicIssuePatterns = [
+    /補助/,
+    /公告/,
+    /政策/,
+    /交通/,
+    /災情/,
+    /地震/,
+    /颱風/,
+    /活動/,
+    /觀光/
+  ];
+  const adScore = promotionalPatterns.filter((pattern) => pattern.test(text)).length;
+  const hasPublicIssue = publicIssuePatterns.some((pattern) => pattern.test(text));
+  const isSocialPost = ['facebook_page', 'facebook_group', 'dcard', 'ptt'].includes(platform);
+
+  if (hasPublicIssue && adScore < 2) return false;
+  return adScore >= 2 || (isSocialPost && adScore >= 1);
+}
+
 function isFacebookPlatform(platform) {
   return ['facebook_page', 'facebook_group'].includes(platform);
 }
@@ -442,7 +482,9 @@ export async function handler(event) {
       popularKeywords,
       negativeAlerts,
       dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords, negativeAlerts),
-      latestArticles: articles.filter((item) => item.platform !== 'google_reviews').slice(0, 10)
+      latestArticles: articles
+        .filter((item) => item.platform !== 'google_reviews' && !isPromotionalArticle(item))
+        .slice(0, 10)
     });
   } catch (err) {
     const status = err.message === '尚未登入' ? 401 : 500;
