@@ -337,15 +337,14 @@ function buildGoogleReviewStats(articles) {
   };
 }
 
-function buildFacebookStats(articles) {
+function buildFacebookStats(articles, days = 7) {
   const posts = articles.filter((item) => (
     ['facebook_page', 'facebook_group'].includes(item.platform)
-    && item.post_id
     && isFacebookPostUrl(item.url)
-    && isRecentByPublishedAt(item, 7)
+    && isRecentByPublishedAt(item, days)
   ));
-  const trendDays = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(Date.now() - (6 - index) * 86400000);
+  const trendDays = Array.from({ length: days }, (_, index) => {
+    const date = new Date(Date.now() - (days - 1 - index) * 86400000);
     const key = dateKey(date);
     return { key, name: key.slice(5).replace('-', '/'), value: 0 };
   });
@@ -417,7 +416,7 @@ export async function handler(event) {
       supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword'),
       supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000),
       supabase.from('articles').select('*').eq('sentiment', 'negative').gte('created_at', negativeCutoff.toISOString()).order('created_at', { ascending: false }).limit(500),
-      supabase.from('articles').select('*').in('platform', ['facebook_page', 'facebook_group']).not('post_id', 'is', null).order('created_at', { ascending: false }).limit(1000)
+      supabase.from('articles').select('*').in('platform', ['facebook_page', 'facebook_group']).order('created_at', { ascending: false }).limit(1500)
     ]);
     if (articleResult.error) throw articleResult.error;
     if (keywordResult.error) throw keywordResult.error;
@@ -483,7 +482,7 @@ export async function handler(event) {
       .slice(0, 10);
     const youtubeStats = buildYouTubeStats(articles);
     const googleReviewStats = buildGoogleReviewStats(articles);
-    const facebookStats = buildFacebookStats(facebookArticles);
+    const facebookStats = buildFacebookStats(facebookArticles, selectedKeyword ? 30 : 7);
     const dcardStats = buildDcardStats(filteredSocialPosts.filter((item) => item.source === 'dcard'), keywords);
     const pttStats = buildPttStats(filteredSocialPosts.filter((item) => item.source === 'ptt'), keywords);
 
