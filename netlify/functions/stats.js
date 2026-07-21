@@ -77,6 +77,17 @@ function publishedTimestamp(value, now = new Date()) {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
+function effectiveTimestamp(article) {
+  return publishedTimestamp(article?.published_at) || Date.parse(article?.created_at || '') || 0;
+}
+
+function isRecentByPublishedAt(article, days) {
+  const timestamp = effectiveTimestamp(article);
+  if (!timestamp) return false;
+  const cutoff = Date.now() - days * 86400000;
+  return timestamp >= cutoff && timestamp <= Date.now() + 86400000;
+}
+
 function articleText(article) {
   return `${article.title || ''} ${article.content || ''} ${article.snippet || ''} ${article.summary || ''} ${article.source || ''}`.toLowerCase();
 }
@@ -331,6 +342,7 @@ function buildFacebookStats(articles) {
     ['facebook_page', 'facebook_group'].includes(item.platform)
     && item.post_id
     && isFacebookPostUrl(item.url)
+    && isRecentByPublishedAt(item, 7)
   ));
   const trendDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(Date.now() - (6 - index) * 86400000);
@@ -399,14 +411,13 @@ export async function handler(event) {
     const selectedKeyword = (params.keyword || '').trim();
     const today = dateKey();
     const negativeCutoff = new Date(Date.now() - 7 * 86400000);
-    const facebookCutoff = new Date(Date.now() - 7 * 86400000);
 
     const [articleResult, keywordResult, postResult, negativeResult, facebookResult] = await Promise.all([
-      supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(1000),
       supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword'),
       supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000),
       supabase.from('articles').select('*').eq('sentiment', 'negative').gte('created_at', negativeCutoff.toISOString()).order('created_at', { ascending: false }).limit(500),
-      supabase.from('articles').select('*').in('platform', ['facebook_page', 'facebook_group']).not('post_id', 'is', null).gte('created_at', facebookCutoff.toISOString()).order('created_at', { ascending: false }).limit(500)
+      supabase.from('articles').select('*').in('platform', ['facebook_page', 'facebook_group']).not('post_id', 'is', null).order('created_at', { ascending: false }).limit(1000)
     ]);
     if (articleResult.error) throw articleResult.error;
     if (keywordResult.error) throw keywordResult.error;
@@ -513,7 +524,8 @@ export async function handler(event) {
       negativeAlerts,
       dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords, negativeAlerts),
       latestArticles: articles
-        .filter((item) => item.platform !== 'google_reviews' && !isPromotionalArticle(item))
+        .filter((item) => item.platform !== 'google_reviews' && !isPromotionalArticle(item) && isRecentByPublishedAt(item, 14))
+        .sort((a, b) => effectiveTimestamp(b) - effectiveTimestamp(a))
         .slice(0, 10)
     });
   } catch (err) {
