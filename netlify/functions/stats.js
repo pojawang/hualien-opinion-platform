@@ -36,12 +36,14 @@ function countBy(items, key, fallback = '其他') {
 }
 
 function dateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Taipei',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function publishedTimestamp(value, now = new Date()) {
