@@ -378,6 +378,20 @@ a {
   margin-top: 14px;
 }
 
+.electionMeta {
+  color: #33413e;
+  font-size: 14px;
+  font-weight: 800;
+  margin: 6px 0 0;
+}
+
+.electionMeta.muted {
+  color: #64736f;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
 .electionCard {
   background: #f8fbfa;
   border: 1px solid #dcebe7;

@@ -498,6 +498,7 @@ function buildPeakSummary(keyword, items) {
 }
 
 function buildElectionSummary(articles, socialPosts) {
+  const startDate = new Date(Date.now() - ELECTION_RECENT_DAYS * 86400000);
   const normalizedPosts = (socialPosts || []).map((post) => ({
     ...post,
     platform: post.source,
@@ -510,7 +511,14 @@ function buildElectionSummary(articles, socialPosts) {
     .filter((item) => isRecentByPublishedAt(item, ELECTION_RECENT_DAYS))
     .filter((item) => !isPromotionalArticle(item));
 
-  return ELECTION_KEYWORDS.map((keyword) => {
+  return {
+    meta: {
+      startDate: dateKey(startDate),
+      endDate: dateKey(),
+      days: ELECTION_RECENT_DAYS,
+      note: '近 90 天，含新聞、一般網站、RSS、YouTube、Facebook、Dcard、PTT；排除廣告文並依標題/網址去重。'
+    },
+    items: ELECTION_KEYWORDS.map((keyword) => {
     const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
     const counts = matched.reduce((acc, item) => {
       acc[normalizedSentiment(item.sentiment)] += 1;
@@ -530,7 +538,8 @@ function buildElectionSummary(articles, socialPosts) {
       favorability: favorabilityValue(counts.positive, counts.negative),
       peak: buildPeakSummary(keyword, matched)
     };
-  });
+    })
+  };
 }
 
 export async function handler(event) {
@@ -654,7 +663,8 @@ export async function handler(event) {
       popularKeywords,
       negativeAlerts,
       dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords, negativeAlerts),
-      electionSummary,
+      electionSummary: electionSummary.items,
+      electionSummaryMeta: electionSummary.meta,
       latestArticles: articles
         .filter((item) => item.platform !== 'google_reviews' && !isPromotionalArticle(item) && isRecentByPublishedAt(item, 14))
         .sort((a, b) => effectiveTimestamp(b) - effectiveTimestamp(a))

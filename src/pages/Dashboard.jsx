@@ -107,13 +107,18 @@ function ReviewRanking({ title, items = [], emptyText }) {
   );
 }
 
-function ElectionSummaryPanel({ items = [] }) {
+function ElectionSummaryPanel({ items = [], meta = {} }) {
   return (
     <section className="panel electionPanel">
       <div className="sectionHeading">
         <div>
           <span className="sectionKicker">Election Brief</span>
           <h3>花蓮縣長選情輿情摘要</h3>
+          <p className="electionMeta">
+            監測期間：{meta.startDate || '未提供'} 至 {meta.endDate || '未提供'}
+            {meta.days ? `，近 ${meta.days} 天` : ''}
+          </p>
+          {meta.note && <p className="electionMeta muted">{meta.note}</p>}
         </div>
       </div>
       <div className="electionGrid">
@@ -277,7 +282,7 @@ export default function Dashboard() {
         <p>{stats.dailySummary}</p>
       </section>
       <div hidden={!visibleSections.summary}>
-        <ElectionSummaryPanel items={stats.electionSummary || []} />
+        <ElectionSummaryPanel items={stats.electionSummary || []} meta={stats.electionSummaryMeta || {}} />
       </div>
       <section className="chartGrid" hidden={!visibleSections.trend}>
         <div className="panel analyticsPanel">
