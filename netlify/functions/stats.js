@@ -563,6 +563,33 @@ function buildElectionSummary(articles, socialPosts) {
   };
 }
 
+function buildPopularKeywords(keywords, articles, socialPosts, selectedKeyword = '') {
+  const normalizedPosts = (socialPosts || []).map((post) => ({
+    ...post,
+    platform: post.source,
+    source: post.source_name || post.source,
+    importance: post.importance || 'medium',
+    created_at: post.created_at || post.published_at
+  }));
+  const pool = dedupeElectionItems([...articles, ...normalizedPosts]
+    .filter((item) => item.url || item.title)
+    .filter((item) => isRecentByPublishedAt(item, ELECTION_RECENT_DAYS))
+    .filter((item) => !isPromotionalArticle(item))
+    .filter((item) => !isUrlLikeTitle(item)));
+  const scopedPool = selectedKeyword
+    ? pool.filter((item) => matchesKeyword(item, selectedKeyword))
+    : pool;
+
+  return keywords
+    .map((keyword) => ({
+      name: keyword,
+      value: dedupeElectionItems(scopedPool.filter((article) => matchesKeyword(article, keyword))).length
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'zh-Hant'))
+    .slice(0, 10);
+}
+
 export async function handler(event) {
   try {
     guard(event);
@@ -621,14 +648,7 @@ export async function handler(event) {
       });
     }
 
-    const popularKeywords = keywords
-      .map((keyword) => ({
-        name: keyword,
-        value: articles.filter((article) => matchesKeyword(article, keyword)).length
-      }))
-      .filter((item) => item.value > 0)
-      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'zh-Hant'))
-      .slice(0, 10);
+    const popularKeywords = buildPopularKeywords(keywords, allArticles, socialPosts, selectedKeyword);
 
     const importanceOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
     const negativeAlerts = [...negativeArticles, ...filteredSocialPosts]
