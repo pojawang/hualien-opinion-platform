@@ -110,6 +110,22 @@ function articleRelevanceText(article) {
   return `${article.title || ''} ${article.content || ''} ${article.snippet || ''} ${article.summary || ''}`.replace(/\s+/g, '').toLowerCase();
 }
 
+function isUrlLikeTitle(article) {
+  const title = String(article.title || '').trim();
+  if (!title) return true;
+  if (/^https?:\/\//i.test(title)) return true;
+  if (article.url && title === String(article.url).trim()) return true;
+  return false;
+}
+
+function isDisplayableLatestArticle(article, keywords) {
+  if (article.platform === 'google_reviews') return false;
+  if (isPromotionalArticle(article)) return false;
+  if (!isRecentByPublishedAt(article, 14)) return false;
+  if (isUrlLikeTitle(article)) return false;
+  return matchesTextKeyword(article, keywords);
+}
+
 function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
   const text = articleRelevanceText(article);
   return keywords.some((keyword) => {
@@ -666,7 +682,7 @@ export async function handler(event) {
       electionSummary: electionSummary.items,
       electionSummaryMeta: electionSummary.meta,
       latestArticles: articles
-        .filter((item) => item.platform !== 'google_reviews' && !isPromotionalArticle(item) && isRecentByPublishedAt(item, 14))
+        .filter((item) => isDisplayableLatestArticle(item, selectedKeyword ? [selectedKeyword] : relevanceKeywords))
         .sort((a, b) => effectiveTimestamp(b) - effectiveTimestamp(a))
         .slice(0, 10)
     });

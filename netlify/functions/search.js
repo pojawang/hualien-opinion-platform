@@ -1,4 +1,5 @@
 import {
+  defaultKeywords,
   fetchMeta,
   fetchWithTimeout,
   isAdminRequest,
@@ -241,6 +242,29 @@ function sourceQuery(source, prefix = '') {
   return [prefix, '花蓮', source.name].filter(Boolean).join(' ');
 }
 
+function normalizeSearchText(value = '') {
+  return String(value || '').replace(/\s+/g, '').toLowerCase();
+}
+
+function isUrlLikeTitle(item) {
+  const title = String(item.title || '').trim();
+  if (!title) return true;
+  if (/^https?:\/\//i.test(title)) return true;
+  return item.url && title === String(item.url).trim();
+}
+
+function sourceItemText(item) {
+  return normalizeSearchText(`${item.title || ''} ${item.snippet || ''} ${item.summary || ''}`);
+}
+
+function matchesAnySourceKeyword(item, keywords) {
+  const text = sourceItemText(item);
+  return keywords.some((keyword) => {
+    const normalized = normalizeSearchText(keyword);
+    return normalized && text.includes(normalized);
+  });
+}
+
 function tagSource(items, source) {
   return items.map((item) => ({
     ...item,
@@ -266,7 +290,7 @@ async function mapWithConcurrency(items, limit, mapper) {
   return results;
 }
 
-async function collectXmlSource(source) {
+async function collectXmlSource(source, keywords = []) {
   const items = await parseXmlFeed(source.url, source.source_type);
   const selectedItems = items.slice(0, 25);
   const enrichedItems = await mapWithConcurrency(selectedItems, 4, async (item, index) => {
@@ -285,7 +309,14 @@ async function collectXmlSource(source) {
     return enriched;
   });
 
-  return tagSource(enrichedItems, source);
+  const keywordPool = [...new Set(['花蓮', ...defaultKeywords.map(([keyword]) => keyword), ...keywords])]
+    .map((keyword) => String(keyword || '').trim())
+    .filter(Boolean);
+  const filteredItems = source.source_type === 'sitemap'
+    ? enrichedItems.filter((item) => !isUrlLikeTitle(item) && matchesAnySourceKeyword(item, keywordPool))
+    : enrichedItems;
+
+  return tagSource(filteredItems, source);
 }
 
 async function collectWebsiteSource(source) {
@@ -335,14 +366,14 @@ async function collectApiSource(source) {
   }
 }
 
-async function collectFromSources(sources) {
+async function collectFromSources(sources, keywords = []) {
   const results = [];
   const errors = [];
 
   await mapWithConcurrency(sources, 4, async (source) => {
     try {
       if (['rss', 'sitemap'].includes(source.source_type)) {
-        results.push(...await collectXmlSource(source));
+        results.push(...await collectXmlSource(source, keywords));
       } else if (source.source_type === 'website') {
         results.push(...await collectWebsiteSource(source));
       } else {
@@ -530,7 +561,7 @@ export async function handler(event) {
       const sourcesToCollect = serperBlocked
         ? (sources || []).filter((source) => ['rss', 'sitemap', 'website', 'dcard', 'ptt'].includes(source.source_type))
         : sources || [];
-      const sourceResults = await collectFromSources(sourcesToCollect);
+      const sourceResults = await collectFromSources(sourcesToCollect, allKeywords.map((item) => item.keyword));
       candidates.push(...sourceResults.results);
       errors.push(...sourceResults.errors);
     }
