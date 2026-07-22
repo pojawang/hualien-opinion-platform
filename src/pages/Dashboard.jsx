@@ -106,6 +106,53 @@ function ReviewRanking({ title, items = [], emptyText }) {
   );
 }
 
+function ElectionSummaryPanel({ items = [] }) {
+  return (
+    <section className="panel electionPanel">
+      <div className="sectionHeading">
+        <div>
+          <span className="sectionKicker">Election Brief</span>
+          <h3>花蓮縣長選情輿情摘要</h3>
+        </div>
+      </div>
+      <div className="electionGrid">
+        {items.map((item) => (
+          <article className="electionCard" key={item.keyword}>
+            <div className="electionCardHeader">
+              <strong>{item.keyword}</strong>
+              <span>{numberFormat.format(Number(item.total) || 0)} 則</span>
+            </div>
+            <div className="sentimentBars">
+              <div>
+                <span>正面 {item.positivePercent}%</span>
+                <i style={{ '--bar-width': `${item.positivePercent || 0}%`, '--bar-color': '#0f766e' }} />
+              </div>
+              <div>
+                <span>中性 {item.neutralPercent}%</span>
+                <i style={{ '--bar-width': `${item.neutralPercent || 0}%`, '--bar-color': '#64748b' }} />
+              </div>
+              <div>
+                <span>負面 {item.negativePercent}%</span>
+                <i style={{ '--bar-width': `${item.negativePercent || 0}%`, '--bar-color': '#b91c1c' }} />
+              </div>
+            </div>
+            <p className="favorability">好感度 P/N 值：<b>{item.favorability}</b></p>
+            <p className="peakSummary">{item.peak?.summary}</p>
+            <div className="peakEvents">
+              {(item.peak?.events || []).map((event) => (
+                <a key={`${item.keyword}-${event.url || event.title}`} href={event.url || '#'} target="_blank" rel="noreferrer">
+                  <span>{cleanArticleText(event.title, '未命名事件')}</span>
+                  <small>{event.source} · {sentimentLabel(event.sentiment)}</small>
+                </a>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
@@ -228,6 +275,9 @@ export default function Dashboard() {
         </div>
         <p>{stats.dailySummary}</p>
       </section>
+      <div hidden={!visibleSections.summary}>
+        <ElectionSummaryPanel items={stats.electionSummary || []} />
+      </div>
       <section className="chartGrid" hidden={!visibleSections.trend}>
         <div className="panel analyticsPanel">
           <div className="panelTitle">

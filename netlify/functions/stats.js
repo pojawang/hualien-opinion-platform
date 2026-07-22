@@ -404,6 +404,109 @@ function buildPttStats(posts, keywords) {
   };
 }
 
+const ELECTION_KEYWORDS = ['魏嘉賢', '游淑貞', '張峻'];
+
+function normalizedSentiment(value) {
+  return ['positive', 'negative', 'neutral'].includes(value) ? value : 'neutral';
+}
+
+function percentage(value, total) {
+  if (!total) return 0;
+  return Math.round((value / total) * 1000) / 10;
+}
+
+function favorabilityValue(positive, negative) {
+  if (negative === 0) return positive > 0 ? '∞' : '0.00';
+  return (positive / negative).toFixed(2);
+}
+
+function buildPeakSummary(keyword, items) {
+  const dayMap = new Map();
+  for (const item of items) {
+    const timestamp = effectiveTimestamp(item);
+    if (!timestamp) continue;
+    const key = dateKey(new Date(timestamp));
+    if (!key) continue;
+    const current = dayMap.get(key) || [];
+    current.push(item);
+    dayMap.set(key, current);
+  }
+
+  const peak = Array.from(dayMap.entries())
+    .map(([date, dayItems]) => ({ date, count: dayItems.length, items: dayItems }))
+    .sort((a, b) => b.count - a.count || b.date.localeCompare(a.date))[0];
+
+  if (!peak) {
+    return {
+      date: '',
+      count: 0,
+      summary: `${keyword} 目前沒有可辨識的高峰事件。`,
+      events: []
+    };
+  }
+
+  const importanceWeight = { urgent: 5, high: 4, medium: 2, low: 1 };
+  const events = peak.items
+    .slice()
+    .sort((a, b) => {
+      const weightA = importanceWeight[a.importance] || 0;
+      const weightB = importanceWeight[b.importance] || 0;
+      const hotA = Number(a.hotness_score || a.like_count || a.comment_count || a.view_count) || 0;
+      const hotB = Number(b.hotness_score || b.like_count || b.comment_count || b.view_count) || 0;
+      return weightB - weightA || hotB - hotA || effectiveTimestamp(b) - effectiveTimestamp(a);
+    })
+    .slice(0, 3)
+    .map((item) => ({
+      title: item.title || '未命名事件',
+      source: item.source || item.source_name || item.platform || '未知來源',
+      sentiment: normalizedSentiment(item.sentiment),
+      url: item.url || ''
+    }));
+
+  const eventTitles = events.map((event) => event.title).join('、');
+  return {
+    date: peak.date,
+    count: peak.count,
+    summary: `${keyword} 在 ${peak.date} 出現 ${peak.count} 則聲量高峰，主要集中於：${eventTitles || '尚無代表事件'}。`,
+    events
+  };
+}
+
+function buildElectionSummary(articles, socialPosts) {
+  const normalizedPosts = (socialPosts || []).map((post) => ({
+    ...post,
+    platform: post.source,
+    source: post.source_name || post.source,
+    importance: post.importance || 'medium',
+    created_at: post.created_at || post.published_at
+  }));
+  const pool = [...articles, ...normalizedPosts]
+    .filter((item) => item.url || item.title)
+    .filter((item) => !isPromotionalArticle(item));
+
+  return ELECTION_KEYWORDS.map((keyword) => {
+    const matched = pool.filter((item) => matchesKeyword(item, keyword));
+    const counts = matched.reduce((acc, item) => {
+      acc[normalizedSentiment(item.sentiment)] += 1;
+      return acc;
+    }, { positive: 0, neutral: 0, negative: 0 });
+    const total = matched.length;
+
+    return {
+      keyword,
+      total,
+      positiveCount: counts.positive,
+      neutralCount: counts.neutral,
+      negativeCount: counts.negative,
+      positivePercent: percentage(counts.positive, total),
+      neutralPercent: percentage(counts.neutral, total),
+      negativePercent: percentage(counts.negative, total),
+      favorability: favorabilityValue(counts.positive, counts.negative),
+      peak: buildPeakSummary(keyword, matched)
+    };
+  });
+}
+
 export async function handler(event) {
   try {
     guard(event);
@@ -487,6 +590,7 @@ export async function handler(event) {
     const facebookStats = buildFacebookStats(facebookArticles, selectedKeyword ? 30 : 7);
     const dcardStats = buildDcardStats(filteredSocialPosts.filter((item) => item.source === 'dcard'), keywords);
     const pttStats = buildPttStats(filteredSocialPosts.filter((item) => item.source === 'ptt'), keywords);
+    const electionSummary = buildElectionSummary(allArticles, socialPosts);
 
     return json(200, {
       keywords,
@@ -524,6 +628,7 @@ export async function handler(event) {
       popularKeywords,
       negativeAlerts,
       dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords, negativeAlerts),
+      electionSummary,
       latestArticles: articles
         .filter((item) => item.platform !== 'google_reviews' && !isPromotionalArticle(item) && isRecentByPublishedAt(item, 14))
         .sort((a, b) => effectiveTimestamp(b) - effectiveTimestamp(a))

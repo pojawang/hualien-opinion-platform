@@ -366,6 +366,117 @@ a {
   margin: 10px 0 0;
 }
 
+.electionPanel {
+  background: #fff;
+  border-left: 5px solid #2563eb;
+}
+
+.electionGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.electionCard {
+  background: #f8fbfa;
+  border: 1px solid #dcebe7;
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.electionCardHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.electionCardHeader strong {
+  color: #0b201c;
+  font-size: 22px;
+}
+
+.electionCardHeader span {
+  background: #e9f3ff;
+  border-radius: 999px;
+  color: #1d4ed8;
+  font-weight: 900;
+  padding: 6px 10px;
+}
+
+.sentimentBars {
+  display: grid;
+  gap: 8px;
+}
+
+.sentimentBars div {
+  display: grid;
+  gap: 5px;
+}
+
+.sentimentBars span {
+  color: #52615d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sentimentBars i {
+  background: #e5eeeb;
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.sentimentBars i::before {
+  background: var(--bar-color, #0f766e);
+  border-radius: inherit;
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--bar-width, 0%);
+}
+
+.favorability {
+  color: #33413e;
+  font-weight: 800;
+  margin: 0;
+}
+
+.favorability b {
+  color: #0f766e;
+  font-size: 20px;
+}
+
+.peakSummary {
+  color: #384743;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.peakEvents {
+  display: grid;
+  gap: 8px;
+}
+
+.peakEvents a {
+  border-top: 1px solid #dcebe7;
+  color: #006c67;
+  display: grid;
+  gap: 3px;
+  font-weight: 900;
+  padding-top: 8px;
+  text-decoration: none;
+}
+
+.peakEvents small {
+  color: #64736f;
+  font-weight: 700;
+}
+
 .sectionHeading {
   align-items: center;
   display: flex;
@@ -835,6 +946,7 @@ a {
 
   .statsGrid,
   .chartGrid,
+  .electionGrid,
   .formGrid,
   .facebookPageForm,
   .facebookPageRow,
