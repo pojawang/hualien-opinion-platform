@@ -32,6 +32,7 @@ const PAGE_SIZE = 5;
 const sectionOptions = [
   ['overview', '狀態總覽'],
   ['summary', 'AI 每日摘要'],
+  ['election', '花蓮縣長選情輿情摘要'],
   ['trend', '聲量與情緒'],
   ['keywords', '關鍵字與負評'],
   ['facebook', 'Facebook 分析'],
@@ -281,7 +282,7 @@ export default function Dashboard() {
         </div>
         <p>{stats.dailySummary}</p>
       </section>
-      <div hidden={!visibleSections.summary}>
+      <div hidden={!visibleSections.election}>
         <ElectionSummaryPanel items={stats.electionSummary || []} meta={stats.electionSummaryMeta || {}} />
       </div>
       <section className="chartGrid" hidden={!visibleSections.trend}>
