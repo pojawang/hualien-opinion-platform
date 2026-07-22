@@ -21,6 +21,7 @@ import {
   cleanArticleText,
   importanceLabel,
   localizeSentimentCounts,
+  sentimentLabel,
   sourceTypeLabel
 } from '../lib/labels.js';
 
