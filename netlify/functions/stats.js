@@ -126,6 +126,11 @@ function isDisplayableLatestArticle(article, keywords) {
   return matchesTextKeyword(article, keywords);
 }
 
+function isTopicRelevantArticle(article, keywords) {
+  if (isUrlLikeTitle(article)) return false;
+  return matchesTextKeyword(article, keywords);
+}
+
 function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
   const text = articleRelevanceText(article);
   return keywords.some((keyword) => {
@@ -593,9 +598,9 @@ export async function handler(event) {
     const filteredSocialPosts = selectedKeyword
       ? socialPosts.filter((item) => matchesKeyword(item, selectedKeyword))
       : socialPosts;
-    const negativeArticles = selectedKeyword
-      ? (negativeResult.data || []).filter((item) => isRelevantArticle(item) && matchesKeyword(item, selectedKeyword))
-      : (negativeResult.data || []).filter(isRelevantArticle);
+    const alertKeywords = selectedKeyword ? [selectedKeyword] : relevanceKeywords;
+    const negativeArticles = (negativeResult.data || [])
+      .filter((item) => isRelevantArticle(item) && isTopicRelevantArticle(item, alertKeywords));
     const facebookArticles = selectedKeyword
       ? (facebookResult.data || []).filter((item) => isRelevantArticle(item) && matchesKeyword(item, selectedKeyword))
       : (facebookResult.data || []).filter(isRelevantArticle);
@@ -629,6 +634,7 @@ export async function handler(event) {
     const negativeAlerts = [...negativeArticles, ...filteredSocialPosts]
       .filter((item) => {
         if (item.sentiment !== 'negative') return false;
+        if (!isTopicRelevantArticle(item, alertKeywords)) return false;
         const timestamp = publishedTimestamp(item.published_at);
         return timestamp !== null
           && timestamp >= negativeCutoff.getTime()
