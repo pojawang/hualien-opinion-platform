@@ -405,6 +405,7 @@ function buildPttStats(posts, keywords) {
 }
 
 const ELECTION_KEYWORDS = ['魏嘉賢', '游淑貞', '張峻'];
+const ELECTION_RECENT_DAYS = 90;
 
 function normalizedSentiment(value) {
   return ['positive', 'negative', 'neutral'].includes(value) ? value : 'neutral';
@@ -418,6 +419,30 @@ function percentage(value, total) {
 function favorabilityValue(positive, negative) {
   if (negative === 0) return positive > 0 ? '∞' : '0.00';
   return (positive / negative).toFixed(2);
+}
+
+function electionDedupKey(item) {
+  const title = String(item.title || '').replace(/\s+/g, '').toLowerCase();
+  if (title.length >= 8) return `title:${title}`;
+
+  try {
+    const url = new URL(String(item.url || ''));
+    url.hash = '';
+    url.search = '';
+    return `url:${url.toString().toLowerCase()}`;
+  } catch {
+    return `fallback:${String(item.url || item.id || item.external_id || title)}`;
+  }
+}
+
+function dedupeElectionItems(items) {
+  const map = new Map();
+  for (const item of items) {
+    const key = electionDedupKey(item);
+    if (!key || map.has(key)) continue;
+    map.set(key, item);
+  }
+  return Array.from(map.values());
 }
 
 function buildPeakSummary(keyword, items) {
@@ -446,7 +471,7 @@ function buildPeakSummary(keyword, items) {
   }
 
   const importanceWeight = { urgent: 5, high: 4, medium: 2, low: 1 };
-  const events = peak.items
+  const events = dedupeElectionItems(peak.items)
     .slice()
     .sort((a, b) => {
       const weightA = importanceWeight[a.importance] || 0;
@@ -482,10 +507,11 @@ function buildElectionSummary(articles, socialPosts) {
   }));
   const pool = [...articles, ...normalizedPosts]
     .filter((item) => item.url || item.title)
+    .filter((item) => isRecentByPublishedAt(item, ELECTION_RECENT_DAYS))
     .filter((item) => !isPromotionalArticle(item));
 
   return ELECTION_KEYWORDS.map((keyword) => {
-    const matched = pool.filter((item) => matchesKeyword(item, keyword));
+    const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
     const counts = matched.reduce((acc, item) => {
       acc[normalizedSentiment(item.sentiment)] += 1;
       return acc;
