@@ -40,19 +40,30 @@ export async function handler(event) {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
     if (apifyConfigured()) {
-      const result = await startFacebookApifyRuns();
-      if (result.started > 0) {
+      try {
+        const result = await startFacebookApifyRuns();
+        if (result.started > 0) {
+          return json(202, {
+            ...result,
+            message: `Apify Facebook 巡查已啟動 ${result.started} 個任務，系統會自動檢查並匯入結果。`
+          });
+        }
+        const fallback = await triggerPlaywrightFallback();
         return json(202, {
           ...result,
-          message: `Apify Facebook 巡查已啟動 ${result.started} 個任務，系統會自動檢查並匯入結果。`
+          fallback,
+          message: fallback.message
+        });
+      } catch (apifyError) {
+        const fallback = await triggerPlaywrightFallback();
+        return json(202, {
+          ok: true,
+          provider: 'playwright',
+          apifyError: apifyError.message,
+          fallback,
+          message: `Apify 巡查失敗（${apifyError.message}），已自動改用 Playwright 備援巡查，避免 Facebook 巡查停擺。`
         });
       }
-      const fallback = await triggerPlaywrightFallback();
-      return json(202, {
-        ...result,
-        fallback,
-        message: fallback.message
-      });
     }
 
     const fallback = await triggerPlaywrightFallback();
