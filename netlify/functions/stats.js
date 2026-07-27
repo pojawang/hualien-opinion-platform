@@ -430,6 +430,7 @@ const ELECTION_RECENT_DAYS = 90;
 const ELECTION_POSITIVE_WORDS = ['支持', '肯定', '力挺', '讚賞', '滿意', '看好', '加分', '政績', '完成', '改善'];
 const ELECTION_NEGATIVE_WORDS = ['批評', '質疑', '爭議', '抨擊', '不滿', '抗議', '涉案', '怒轟', '失言', '黑箱', '違法'];
 const ELECTION_NEUTRAL_WORDS = ['出席', '表示', '指出', '宣布', '拜會', '參選', '登記', '說明'];
+const ELECTION_IMPORTANCE_WEIGHT = { urgent: 5, high: 4, medium: 2, low: 1 };
 
 function normalizedSentiment(value) {
   return ['positive', 'negative', 'neutral'].includes(value) ? value : 'neutral';
@@ -482,6 +483,23 @@ function dedupeElectionItems(items) {
   return Array.from(map.values());
 }
 
+function electionEventRow(item) {
+  return {
+    title: item.title || '未命名事件',
+    source: item.source || item.source_name || item.platform || '未知來源',
+    sentiment: electionSentiment(item),
+    url: item.url || ''
+  };
+}
+
+function sortElectionEvents(a, b) {
+  const weightA = ELECTION_IMPORTANCE_WEIGHT[a.importance] || 0;
+  const weightB = ELECTION_IMPORTANCE_WEIGHT[b.importance] || 0;
+  const hotA = Number(a.hotness_score || a.like_count || a.comment_count || a.view_count) || 0;
+  const hotB = Number(b.hotness_score || b.like_count || b.comment_count || b.view_count) || 0;
+  return weightB - weightA || hotB - hotA || effectiveTimestamp(b) - effectiveTimestamp(a);
+}
+
 function buildPeakSummary(keyword, items) {
   const dayMap = new Map();
   for (const item of items) {
@@ -507,23 +525,11 @@ function buildPeakSummary(keyword, items) {
     };
   }
 
-  const importanceWeight = { urgent: 5, high: 4, medium: 2, low: 1 };
   const events = dedupeElectionItems(peak.items)
     .slice()
-    .sort((a, b) => {
-      const weightA = importanceWeight[a.importance] || 0;
-      const weightB = importanceWeight[b.importance] || 0;
-      const hotA = Number(a.hotness_score || a.like_count || a.comment_count || a.view_count) || 0;
-      const hotB = Number(b.hotness_score || b.like_count || b.comment_count || b.view_count) || 0;
-      return weightB - weightA || hotB - hotA || effectiveTimestamp(b) - effectiveTimestamp(a);
-    })
+    .sort(sortElectionEvents)
     .slice(0, 3)
-    .map((item) => ({
-      title: item.title || '未命名事件',
-      source: item.source || item.source_name || item.platform || '未知來源',
-      sentiment: electionSentiment(item),
-      url: item.url || ''
-    }));
+    .map(electionEventRow);
 
   const eventTitles = events.map((event) => event.title).join('、');
   return {
@@ -557,6 +563,12 @@ function buildElectionSummary(articles, socialPosts) {
     },
     items: ELECTION_KEYWORDS.map((keyword) => {
     const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
+    const negativeEvents = matched
+      .filter((item) => electionSentiment(item) === 'negative')
+      .slice()
+      .sort(sortElectionEvents)
+      .slice(0, 3)
+      .map(electionEventRow);
     const counts = matched.reduce((acc, item) => {
       acc[electionSentiment(item)] += 1;
       return acc;
@@ -573,7 +585,8 @@ function buildElectionSummary(articles, socialPosts) {
       neutralPercent: percentage(counts.neutral, total),
       negativePercent: percentage(counts.negative, total),
       favorability: favorabilityValue(counts.positive, counts.negative),
-      peak: buildPeakSummary(keyword, matched)
+      peak: buildPeakSummary(keyword, matched),
+      negativeEvents
     };
     })
   };

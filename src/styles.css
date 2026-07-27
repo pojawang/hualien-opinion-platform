@@ -471,6 +471,12 @@ a {
   margin: 0;
 }
 
+.negativeEventsTitle {
+  color: #991b1b;
+  font-size: 15px;
+  margin: 2px 0 0;
+}
+
 .peakEvents {
   display: grid;
   gap: 8px;
@@ -517,6 +523,17 @@ a {
 .sentimentPill.negative {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.emptyNegativeEvents {
+  background: #f8fbfa;
+  border: 1px dashed #cbd7d3;
+  border-radius: 8px;
+  color: #64736f;
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0;
+  padding: 10px 12px;
 }
 
 .sectionHeading {

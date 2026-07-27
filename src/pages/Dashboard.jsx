@@ -145,8 +145,9 @@ function ElectionSummaryPanel({ items = [], meta = {} }) {
             </div>
             <p className="favorability">好感度 P/N 值：<b>{item.favorability}</b></p>
             <p className="peakSummary">{item.peak?.summary}</p>
+            <h4 className="negativeEventsTitle">判斷為負面的新聞連結</h4>
             <div className="peakEvents">
-              {(item.peak?.events || []).map((event) => (
+              {(item.negativeEvents || []).map((event) => (
                 <a key={`${item.keyword}-${event.url || event.title}`} href={event.url || '#'} target="_blank" rel="noreferrer">
                   <span>{cleanArticleText(event.title, '未命名事件')}</span>
                   <small>
@@ -157,6 +158,9 @@ function ElectionSummaryPanel({ items = [], meta = {} }) {
                   </small>
                 </a>
               ))}
+              {(item.negativeEvents || []).length === 0 && (
+                <p className="emptyNegativeEvents">目前沒有判斷為負面的新聞。</p>
+              )}
             </div>
           </article>
         ))}
