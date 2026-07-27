@@ -427,9 +427,25 @@ function buildPttStats(posts, keywords) {
 
 const ELECTION_KEYWORDS = ['魏嘉賢', '游淑貞', '張峻'];
 const ELECTION_RECENT_DAYS = 90;
+const ELECTION_POSITIVE_WORDS = ['支持', '肯定', '力挺', '讚賞', '滿意', '看好', '加分', '政績', '完成', '改善'];
+const ELECTION_NEGATIVE_WORDS = ['批評', '質疑', '爭議', '抨擊', '不滿', '抗議', '涉案', '怒轟', '失言', '黑箱', '違法'];
+const ELECTION_NEUTRAL_WORDS = ['出席', '表示', '指出', '宣布', '拜會', '參選', '登記', '說明'];
 
 function normalizedSentiment(value) {
   return ['positive', 'negative', 'neutral'].includes(value) ? value : 'neutral';
+}
+
+function electionSentiment(item) {
+  const text = articleRelevanceText(item);
+  const positive = ELECTION_POSITIVE_WORDS.filter((word) => text.includes(word)).length;
+  const negative = ELECTION_NEGATIVE_WORDS.filter((word) => text.includes(word)).length;
+  const neutral = ELECTION_NEUTRAL_WORDS.some((word) => text.includes(word));
+
+  if (positive > negative) return 'positive';
+  if (negative > positive) return 'negative';
+  if (positive === negative && positive > 0) return normalizedSentiment(item.sentiment);
+  if (neutral) return 'neutral';
+  return normalizedSentiment(item.sentiment);
 }
 
 function percentage(value, total) {
@@ -505,7 +521,7 @@ function buildPeakSummary(keyword, items) {
     .map((item) => ({
       title: item.title || '未命名事件',
       source: item.source || item.source_name || item.platform || '未知來源',
-      sentiment: normalizedSentiment(item.sentiment),
+      sentiment: electionSentiment(item),
       url: item.url || ''
     }));
 
@@ -542,7 +558,7 @@ function buildElectionSummary(articles, socialPosts) {
     items: ELECTION_KEYWORDS.map((keyword) => {
     const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
     const counts = matched.reduce((acc, item) => {
-      acc[normalizedSentiment(item.sentiment)] += 1;
+      acc[electionSentiment(item)] += 1;
       return acc;
     }, { positive: 0, neutral: 0, negative: 0 });
     const total = matched.length;
