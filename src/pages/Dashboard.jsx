@@ -149,7 +149,12 @@ function ElectionSummaryPanel({ items = [], meta = {} }) {
               {(item.peak?.events || []).map((event) => (
                 <a key={`${item.keyword}-${event.url || event.title}`} href={event.url || '#'} target="_blank" rel="noreferrer">
                   <span>{cleanArticleText(event.title, '未命名事件')}</span>
-                  <small>{event.source} · {sentimentLabel(event.sentiment)}</small>
+                  <small>
+                    {event.source}
+                    <span className={`sentimentPill ${event.sentiment || 'neutral'}`}>
+                      判斷：{sentimentLabel(event.sentiment)}
+                    </span>
+                  </small>
                 </a>
               ))}
             </div>

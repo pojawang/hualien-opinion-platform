@@ -487,8 +487,36 @@ a {
 }
 
 .peakEvents small {
+  align-items: center;
   color: #64736f;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   font-weight: 700;
+}
+
+.sentimentPill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 5px 8px;
+}
+
+.sentimentPill.positive {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.sentimentPill.neutral {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.sentimentPill.negative {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .sectionHeading {
