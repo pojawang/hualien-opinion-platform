@@ -426,7 +426,7 @@ function buildPttStats(posts, keywords) {
 }
 
 const ELECTION_KEYWORDS = ['魏嘉賢', '游淑貞', '張峻'];
-const ELECTION_RECENT_DAYS = 90;
+const ELECTION_RECENT_DAYS = 30;
 const ELECTION_POSITIVE_WORDS = ['支持', '肯定', '力挺', '讚賞', '滿意', '看好', '加分', '政績', '完成', '改善'];
 const ELECTION_NEGATIVE_WORDS = ['批評', '質疑', '爭議', '抨擊', '不滿', '抗議', '涉案', '怒轟', '失言', '黑箱', '違法'];
 const ELECTION_NEUTRAL_WORDS = ['出席', '表示', '指出', '宣布', '拜會', '參選', '登記', '說明'];
@@ -559,7 +559,7 @@ function buildElectionSummary(articles, socialPosts) {
       startDate: dateKey(startDate),
       endDate: dateKey(),
       days: ELECTION_RECENT_DAYS,
-      note: '近 90 天，含新聞、一般網站、RSS、YouTube、Facebook、Dcard、PTT；排除廣告文並依標題/網址去重。'
+      note: '近 30 天，含新聞、一般網站、RSS、YouTube、Facebook、Dcard、PTT；排除廣告文並依標題/網址去重。'
     },
     items: ELECTION_KEYWORDS.map((keyword) => {
     const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
