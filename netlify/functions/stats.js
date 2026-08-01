@@ -177,7 +177,7 @@ function isNegativeAlertContent(item) {
   const hasNegativeSignal = NEGATIVE_ALERT_SIGNAL_WORDS.some((word) => text.includes(word));
   const isContextOnly = NEGATIVE_ALERT_CONTEXT_ONLY_WORDS.some((word) => text.includes(word));
 
-  if (isContextOnly && !hasNegativeSignal) return false;
+  if (isContextOnly) return false;
   return hasNegativeSignal;
 }
 
