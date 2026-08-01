@@ -146,7 +146,10 @@ const NEGATIVE_ALERT_CONTEXT_ONLY_WORDS = [
 ];
 
 function negativeAlertDedupKey(item) {
-  const title = String(item.title || '').replace(/\s+/g, '').toLowerCase();
+  const title = String(item.title || '')
+    .replace(/\s+/g, '')
+    .replace(/[|｜\-－–—_＿:：].*$/g, '')
+    .toLowerCase();
   if (title.length >= 8) return `title:${title}`;
 
   try {
@@ -175,7 +178,7 @@ function isNegativeAlertContent(item) {
   const isContextOnly = NEGATIVE_ALERT_CONTEXT_ONLY_WORDS.some((word) => text.includes(word));
 
   if (isContextOnly && !hasNegativeSignal) return false;
-  return hasNegativeSignal || item.importance === 'urgent' || item.importance === 'high';
+  return hasNegativeSignal;
 }
 
 function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
