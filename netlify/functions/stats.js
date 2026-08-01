@@ -131,6 +131,53 @@ function isTopicRelevantArticle(article, keywords) {
   return matchesTextKeyword(article, keywords);
 }
 
+const NEGATIVE_ALERT_SIGNAL_WORDS = [
+  '批評', '質疑', '不滿', '抗議', '怒轟', '砲轟', '痛批', '遭轟', '挨轟',
+  '爭議', '涉案', '違法', '黑箱', '失言', '弊案', '貪污', '詐騙',
+  '反彈', '道歉', '罷免', '停班', '停課', '封路', '停水', '停電',
+  '災情', '傷亡', '受傷', '死亡', '事故', '淹水', '崩塌', '延誤',
+  '塞車', '問題', '不足', '怠惰', '失職', '不當'
+];
+
+const NEGATIVE_ALERT_CONTEXT_ONLY_WORDS = [
+  '關切', '祈求平安', '強調防災', '防災提升', '提升城市韌性',
+  '城市韌性', '複合式防災', '慰問', '救災', '復原', '演練',
+  '捐贈', '協助', '說明防災', '防災教育'
+];
+
+function negativeAlertDedupKey(item) {
+  const title = String(item.title || '').replace(/\s+/g, '').toLowerCase();
+  if (title.length >= 8) return `title:${title}`;
+
+  try {
+    const url = new URL(String(item.url || ''));
+    url.hash = '';
+    url.search = '';
+    return `url:${url.toString().toLowerCase()}`;
+  } catch {
+    return `fallback:${String(item.url || item.external_id || item.id || title)}`;
+  }
+}
+
+function dedupeNegativeAlerts(items) {
+  const map = new Map();
+  for (const item of items) {
+    const key = negativeAlertDedupKey(item);
+    if (!key || map.has(key)) continue;
+    map.set(key, item);
+  }
+  return Array.from(map.values());
+}
+
+function isNegativeAlertContent(item) {
+  const text = articleRelevanceText(item);
+  const hasNegativeSignal = NEGATIVE_ALERT_SIGNAL_WORDS.some((word) => text.includes(word));
+  const isContextOnly = NEGATIVE_ALERT_CONTEXT_ONLY_WORDS.some((word) => text.includes(word));
+
+  if (isContextOnly && !hasNegativeSignal) return false;
+  return hasNegativeSignal || item.importance === 'urgent' || item.importance === 'high';
+}
+
 function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
   const text = articleRelevanceText(article);
   return keywords.some((keyword) => {
@@ -680,15 +727,17 @@ export async function handler(event) {
     const popularKeywords = buildPopularKeywords(keywords, allArticles, socialPosts, selectedKeyword);
 
     const importanceOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-    const negativeAlerts = [...negativeArticles, ...filteredSocialPosts]
+    const negativeAlerts = dedupeNegativeAlerts([...negativeArticles, ...filteredSocialPosts]
       .filter((item) => {
         if (item.sentiment !== 'negative') return false;
         if (!isTopicRelevantArticle(item, alertKeywords)) return false;
         const timestamp = publishedTimestamp(item.published_at);
         return timestamp !== null
           && timestamp >= negativeCutoff.getTime()
-          && timestamp <= Date.now() + 86400000;
+          && timestamp <= Date.now() + 86400000
+          && isNegativeAlertContent(item);
       })
+    )
       .sort((a, b) => (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9))
       .slice(0, 10);
     const youtubeStats = buildYouTubeStats(articles);
