@@ -478,7 +478,6 @@ function buildPttStats(posts, keywords) {
 const ELECTION_KEYWORDS = ['魏嘉賢', '游淑貞', '張峻'];
 const ELECTION_RECENT_DAYS = 30;
 const ELECTION_POSITIVE_WORDS = ['支持', '肯定', '力挺', '讚賞', '滿意', '看好', '加分', '政績', '完成', '改善'];
-const ELECTION_NEGATIVE_WORDS = ['批評', '質疑', '爭議', '抨擊', '不滿', '抗議', '涉案', '怒轟', '失言', '黑箱', '違法'];
 const ELECTION_NEUTRAL_WORDS = ['出席', '表示', '指出', '宣布', '拜會', '參選', '登記', '說明'];
 const ELECTION_IMPORTANCE_WEIGHT = { urgent: 5, high: 4, medium: 2, low: 1 };
 
@@ -489,14 +488,15 @@ function normalizedSentiment(value) {
 function electionSentiment(item) {
   const text = articleRelevanceText(item);
   const positive = ELECTION_POSITIVE_WORDS.filter((word) => text.includes(word)).length;
-  const negative = ELECTION_NEGATIVE_WORDS.filter((word) => text.includes(word)).length;
   const neutral = ELECTION_NEUTRAL_WORDS.some((word) => text.includes(word));
+  const storedSentiment = normalizedSentiment(item.sentiment);
 
-  if (positive > negative) return 'positive';
-  if (negative > positive) return 'negative';
-  if (positive === negative && positive > 0) return normalizedSentiment(item.sentiment);
+  if (storedSentiment === 'negative') {
+    return isNegativeAlertContent(item) ? 'negative' : 'neutral';
+  }
+  if (positive > 0) return 'positive';
   if (neutral) return 'neutral';
-  return normalizedSentiment(item.sentiment);
+  return storedSentiment;
 }
 
 function percentage(value, total) {
