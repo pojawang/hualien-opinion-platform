@@ -136,7 +136,9 @@ const NEGATIVE_ALERT_SIGNAL_WORDS = [
   '爭議', '涉案', '違法', '黑箱', '失言', '弊案', '貪污', '詐騙',
   '反彈', '道歉', '罷免', '停班', '停課', '封路', '停水', '停電',
   '災情', '傷亡', '受傷', '死亡', '事故', '淹水', '崩塌', '延誤',
-  '塞車', '問題', '不足', '怠惰', '失職', '不當'
+  '塞車', '問題', '不足', '怠惰', '失職', '不當',
+  '酒駕', '肇事', '投毒', '命危', '下毒', '中毒', '蓄意',
+  '未發放完', '未發放', '沒發放', '尚未發放', '未完成', '未落實'
 ];
 
 const NEGATIVE_ALERT_CONTEXT_ONLY_WORDS = [
@@ -177,8 +179,9 @@ function isNegativeAlertContent(item) {
   const hasNegativeSignal = NEGATIVE_ALERT_SIGNAL_WORDS.some((word) => text.includes(word));
   const isContextOnly = NEGATIVE_ALERT_CONTEXT_ONLY_WORDS.some((word) => text.includes(word));
 
+  if (hasNegativeSignal) return true;
   if (isContextOnly) return false;
-  return hasNegativeSignal;
+  return false;
 }
 
 function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
@@ -491,8 +494,9 @@ function electionSentiment(item) {
   const neutral = ELECTION_NEUTRAL_WORDS.some((word) => text.includes(word));
   const storedSentiment = normalizedSentiment(item.sentiment);
 
+  if (isNegativeAlertContent(item)) return 'negative';
   if (storedSentiment === 'negative') {
-    return isNegativeAlertContent(item) ? 'negative' : 'neutral';
+    return 'neutral';
   }
   if (positive > 0) return 'positive';
   if (neutral) return 'neutral';
