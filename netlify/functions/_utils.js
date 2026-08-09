@@ -177,7 +177,11 @@ export function classifyArticle(title = '', snippet = '') {
 
 export function estimateSentiment(title = '', snippet = '') {
   const text = `${title} ${snippet}`;
-  if (['災情', '死亡', '受傷', '封路', '停班', '停課', '詐騙', '抗議', '負面'].some((word) => text.includes(word))) {
+  if ([
+    '災情', '死亡', '受傷', '封路', '停班', '停課', '詐騙', '抗議', '負面',
+    '批評', '質疑', '不滿', '爭議', '涉案', '問題',
+    '未發放完', '未發放', '沒發放', '尚未發放', '避難包未發放', '防災包未發放'
+  ].some((word) => text.includes(word))) {
     return 'negative';
   }
   if (['推薦', '熱鬧', '開幕', '優惠', '好評', '獲獎'].some((word) => text.includes(word))) {

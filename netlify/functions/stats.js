@@ -184,6 +184,16 @@ function isNegativeAlertContent(item) {
   return false;
 }
 
+function dashboardSentiment(item) {
+  if (isNegativeAlertContent(item)) return 'negative';
+  return normalizedSentiment(item.sentiment);
+}
+
+function withDashboardSentiment(item) {
+  const sentiment = dashboardSentiment(item);
+  return sentiment === item.sentiment ? item : { ...item, sentiment };
+}
+
 function matchesTextKeyword(article, keywords = DEFAULT_FACEBOOK_KEYWORDS) {
   const text = articleRelevanceText(article);
   return keywords.some((keyword) => {
@@ -775,7 +785,9 @@ export async function handler(event) {
       .map((keyword) => String(keyword || '').trim())
       .filter(Boolean);
     const isRelevantArticle = (item) => !isFacebookPlatform(item.platform) || matchesTextKeyword(item, relevanceKeywords);
-    const allArticles = (articleResult.data || []).filter(isRelevantArticle);
+    const allArticles = (articleResult.data || [])
+      .filter(isRelevantArticle)
+      .map(withDashboardSentiment);
     const articles = selectedKeyword
       ? allArticles.filter((item) => matchesKeyword(item, selectedKeyword))
       : allArticles;
@@ -784,8 +796,10 @@ export async function handler(event) {
       ? socialPosts.filter((item) => matchesKeyword(item, selectedKeyword))
       : socialPosts;
     const alertKeywords = selectedKeyword ? [selectedKeyword] : relevanceKeywords;
-    const negativeArticles = (negativeResult.data || [])
-      .filter((item) => isRelevantArticle(item) && isTopicRelevantArticle(item, alertKeywords));
+    const negativeArticles = [
+      ...(negativeResult.data || []).map(withDashboardSentiment),
+      ...allArticles.filter((item) => item.sentiment === 'negative')
+    ].filter((item) => isRelevantArticle(item) && isTopicRelevantArticle(item, alertKeywords));
     const facebookArticles = selectedKeyword
       ? (facebookResult.data || []).filter((item) => isRelevantArticle(item) && matchesKeyword(item, selectedKeyword))
       : (facebookResult.data || []).filter(isRelevantArticle);
