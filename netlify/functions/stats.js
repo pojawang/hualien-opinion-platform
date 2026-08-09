@@ -479,22 +479,66 @@ function buildPttStats(posts, keywords) {
 }
 
 const ELECTION_KEYWORDS = ['魏嘉賢', '游淑貞', '張峻'];
-const ELECTION_RECENT_DAYS = 30;
+const ELECTION_RECENT_DAYS = 7;
 const ELECTION_POSITIVE_WORDS = ['支持', '肯定', '力挺', '讚賞', '滿意', '看好', '加分', '政績', '完成', '改善'];
 const ELECTION_NEUTRAL_WORDS = ['出席', '表示', '指出', '宣布', '拜會', '參選', '登記', '說明'];
 const ELECTION_IMPORTANCE_WEIGHT = { urgent: 5, high: 4, medium: 2, low: 1 };
+const ELECTION_SUBJECT_ALIASES = {
+  '魏嘉賢': ['魏嘉賢', '花蓮市長'],
+  '游淑貞': ['游淑貞', '吉安鄉長'],
+  '張峻': ['張峻', '花蓮縣議長', '縣議長']
+};
+const ELECTION_NEGATIVE_SUBJECT_WINDOW = 56;
 
 function normalizedSentiment(value) {
   return ['positive', 'negative', 'neutral'].includes(value) ? value : 'neutral';
 }
 
-function electionSentiment(item) {
+function normalizedCompact(value) {
+  return String(value || '').replace(/\s+/g, '').toLowerCase();
+}
+
+function indexPositions(text, token) {
+  const positions = [];
+  if (!text || !token) return positions;
+  let index = text.indexOf(token);
+  while (index >= 0) {
+    positions.push(index);
+    index = text.indexOf(token, index + Math.max(token.length, 1));
+  }
+  return positions;
+}
+
+function isNegativeForElectionSubject(item, keyword) {
+  if (!keyword || !isNegativeAlertContent(item)) return false;
+
+  const text = articleRelevanceText(item);
+  const aliases = (ELECTION_SUBJECT_ALIASES[keyword] || [keyword])
+    .map(normalizedCompact)
+    .filter(Boolean);
+  const subjectPositions = aliases.flatMap((alias) => indexPositions(text, alias));
+  if (!subjectPositions.length) return false;
+
+  const signalPositions = NEGATIVE_ALERT_SIGNAL_WORDS
+    .map(normalizedCompact)
+    .filter(Boolean)
+    .flatMap((signal) => indexPositions(text, signal));
+
+  return subjectPositions.some((subjectIndex) =>
+    signalPositions.some((signalIndex) =>
+      Math.abs(subjectIndex - signalIndex) <= ELECTION_NEGATIVE_SUBJECT_WINDOW
+    )
+  );
+}
+
+function electionSentiment(item, keyword = '') {
   const text = articleRelevanceText(item);
   const positive = ELECTION_POSITIVE_WORDS.filter((word) => text.includes(word)).length;
   const neutral = ELECTION_NEUTRAL_WORDS.some((word) => text.includes(word));
   const storedSentiment = normalizedSentiment(item.sentiment);
 
-  if (isNegativeAlertContent(item)) return 'negative';
+  if (keyword && isNegativeForElectionSubject(item, keyword)) return 'negative';
+  if (!keyword && isNegativeAlertContent(item)) return 'negative';
   if (storedSentiment === 'negative') {
     return 'neutral';
   }
@@ -537,11 +581,11 @@ function dedupeElectionItems(items) {
   return Array.from(map.values());
 }
 
-function electionEventRow(item) {
+function electionEventRow(item, keyword = '') {
   return {
     title: item.title || '未命名事件',
     source: item.source || item.source_name || item.platform || '未知來源',
-    sentiment: electionSentiment(item),
+    sentiment: electionSentiment(item, keyword),
     url: item.url || ''
   };
 }
@@ -583,7 +627,7 @@ function buildPeakSummary(keyword, items) {
     .slice()
     .sort(sortElectionEvents)
     .slice(0, 3)
-    .map(electionEventRow);
+    .map((item) => electionEventRow(item, keyword));
 
   const eventTitles = events.map((event) => event.title).join('、');
   return {
@@ -613,18 +657,18 @@ function buildElectionSummary(articles, socialPosts) {
       startDate: dateKey(startDate),
       endDate: dateKey(),
       days: ELECTION_RECENT_DAYS,
-      note: '近 30 天，含新聞、一般網站、RSS、YouTube、Facebook、Dcard、PTT；排除廣告文並依標題/網址去重。'
+      note: '近 7 天，含新聞、一般網站、RSS、YouTube、Facebook、Dcard、PTT；排除廣告文並依標題/網址去重。'
     },
     items: ELECTION_KEYWORDS.map((keyword) => {
     const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
     const negativeEvents = matched
-      .filter((item) => electionSentiment(item) === 'negative')
+      .filter((item) => electionSentiment(item, keyword) === 'negative')
       .slice()
       .sort(sortElectionEvents)
       .slice(0, 3)
-      .map(electionEventRow);
+      .map((item) => electionEventRow(item, keyword));
     const counts = matched.reduce((acc, item) => {
-      acc[electionSentiment(item)] += 1;
+      acc[electionSentiment(item, keyword)] += 1;
       return acc;
     }, { positive: 0, neutral: 0, negative: 0 });
     const total = matched.length;
