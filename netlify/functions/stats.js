@@ -489,6 +489,14 @@ const ELECTION_SUBJECT_ALIASES = {
   '張峻': ['張峻', '花蓮縣議長', '縣議長']
 };
 const ELECTION_NEGATIVE_SUBJECT_WINDOW = 56;
+const ELECTION_ADVERSE_EVENT_WORDS = [
+  '爭議', '涉案', '違法', '黑箱', '失言', '弊案', '貪污', '詐騙',
+  '酒駕', '肇事', '投毒', '命危', '下毒', '中毒', '蓄意',
+  '遭轟', '挨轟', '道歉', '罷免', '失職', '不當'
+];
+const ELECTION_TARGETED_NEGATIVE_WORDS = [
+  '批評', '質疑', '不滿', '抗議', '怒轟', '砲轟', '痛批', '抨擊'
+];
 
 function normalizedSentiment(value) {
   return ['positive', 'negative', 'neutral'].includes(value) ? value : 'neutral';
@@ -509,6 +517,39 @@ function indexPositions(text, token) {
   return positions;
 }
 
+function sameTextWindow(text, leftIndex, rightIndex, size = ELECTION_NEGATIVE_SUBJECT_WINDOW) {
+  if (leftIndex < 0 || rightIndex < 0) return false;
+  return Math.abs(leftIndex - rightIndex) <= size;
+}
+
+function hasSubjectAdverseEvent(text, aliases) {
+  return aliases.some((alias) =>
+    indexPositions(text, alias).some((subjectIndex) =>
+      ELECTION_ADVERSE_EVENT_WORDS.map(normalizedCompact)
+        .filter(Boolean)
+        .some((signal) =>
+          indexPositions(text, signal).some((signalIndex) =>
+            signalIndex >= subjectIndex && sameTextWindow(text, subjectIndex, signalIndex)
+          )
+        )
+    )
+  );
+}
+
+function hasCandidateAsNegativeTarget(text, aliases) {
+  return aliases.some((alias) =>
+    indexPositions(text, alias).some((subjectIndex) =>
+      ELECTION_TARGETED_NEGATIVE_WORDS.map(normalizedCompact)
+        .filter(Boolean)
+        .some((signal) =>
+          indexPositions(text, signal).some((signalIndex) =>
+            signalIndex <= subjectIndex && sameTextWindow(text, signalIndex, subjectIndex, 36)
+          )
+        )
+    )
+  );
+}
+
 function isNegativeForElectionSubject(item, keyword) {
   if (!keyword || !isNegativeAlertContent(item)) return false;
 
@@ -516,19 +557,9 @@ function isNegativeForElectionSubject(item, keyword) {
   const aliases = (ELECTION_SUBJECT_ALIASES[keyword] || [keyword])
     .map(normalizedCompact)
     .filter(Boolean);
-  const subjectPositions = aliases.flatMap((alias) => indexPositions(text, alias));
-  if (!subjectPositions.length) return false;
+  if (!aliases.some((alias) => text.includes(alias))) return false;
 
-  const signalPositions = NEGATIVE_ALERT_SIGNAL_WORDS
-    .map(normalizedCompact)
-    .filter(Boolean)
-    .flatMap((signal) => indexPositions(text, signal));
-
-  return subjectPositions.some((subjectIndex) =>
-    signalPositions.some((signalIndex) =>
-      Math.abs(subjectIndex - signalIndex) <= ELECTION_NEGATIVE_SUBJECT_WINDOW
-    )
-  );
+  return hasSubjectAdverseEvent(text, aliases) || hasCandidateAsNegativeTarget(text, aliases);
 }
 
 function electionSentiment(item, keyword = '') {
