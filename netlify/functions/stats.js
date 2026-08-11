@@ -136,8 +136,14 @@ const NEGATIVE_ALERT_SIGNAL_WORDS = [
   '爭議', '涉案', '違法', '黑箱', '失言', '弊案', '貪污', '詐騙',
   '反彈', '道歉', '罷免', '停班', '停課', '封路', '停水', '停電',
   '災情', '傷亡', '受傷', '死亡', '事故', '淹水', '崩塌', '延誤',
-  '塞車', '問題', '不足', '怠惰', '失職', '不當',
+  '塞車', '問題', '不足', '怠惰', '失職', '不當', '風險最高', '走路風險', '高風險',
   '酒駕', '肇事', '投毒', '命危', '下毒', '中毒', '蓄意',
+  '未發放完', '未發放', '沒發放', '尚未發放', '未完成', '未落實'
+];
+
+const NEGATIVE_ALERT_STRONG_SIGNAL_WORDS = [
+  '風險最高', '走路風險', '高風險', '死亡', '受傷', '傷亡', '事故',
+  '酒駕', '肇事', '投毒', '命危', '下毒', '中毒', '違法', '涉案',
   '未發放完', '未發放', '沒發放', '尚未發放', '未完成', '未落實'
 ];
 
@@ -145,6 +151,12 @@ const NEGATIVE_ALERT_CONTEXT_ONLY_WORDS = [
   '關切', '祈求平安', '強調防災', '防災提升', '提升城市韌性',
   '城市韌性', '複合式防災', '慰問', '救災', '復原', '演練',
   '捐贈', '協助', '說明防災', '防災教育'
+];
+
+const NEGATIVE_ALERT_IMPROVEMENT_WORDS = [
+  '蛻變', '亮點', '新亮點', '產業基地', '青創', '文化與青創',
+  '拚防災', '防災顧問', '當顧問', '提升', '改善', '推動', '轉型',
+  '活化', '成為', '應從', '應該從', '規劃', '建議', '願景'
 ];
 
 function negativeAlertDedupKey(item) {
@@ -176,9 +188,13 @@ function dedupeNegativeAlerts(items) {
 
 function isNegativeAlertContent(item) {
   const text = articleRelevanceText(item);
+  const hasStrongNegativeSignal = NEGATIVE_ALERT_STRONG_SIGNAL_WORDS.some((word) => text.includes(word));
   const hasNegativeSignal = NEGATIVE_ALERT_SIGNAL_WORDS.some((word) => text.includes(word));
   const isContextOnly = NEGATIVE_ALERT_CONTEXT_ONLY_WORDS.some((word) => text.includes(word));
+  const isImprovementContext = NEGATIVE_ALERT_IMPROVEMENT_WORDS.some((word) => text.includes(word));
 
+  if (hasStrongNegativeSignal) return true;
+  if (isImprovementContext) return false;
   if (hasNegativeSignal) return true;
   if (isContextOnly) return false;
   return false;
