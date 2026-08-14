@@ -191,6 +191,42 @@ export function estimateSentiment(title = '', snippet = '') {
   return 'neutral';
 }
 
+function estimateTitleFirstSentiment(title = '', snippet = '') {
+  const normalize = (value) => String(value || '').replace(/\s+/g, '').toLowerCase();
+  const titleText = normalize(title);
+  const allText = normalize(`${title} ${snippet}`);
+  const hasAny = (text, words) => words.some((word) => text.includes(normalize(word)));
+
+  const strongNegative = [
+    '死亡', '受傷', '傷亡', '事故', '酒駕', '肇事', '投毒', '命危', '下毒', '中毒',
+    '違法', '涉案', '弊案', '貪污', '詐騙', '黑箱', '失言', '罷免',
+    '未發放完', '未發放', '沒發放', '尚未發放', '未完成', '未落實',
+    '風險最高', '走路風險', '高風險', '防災包未發放', '避難包未發放',
+    '停班', '停課', '封路', '停水', '停電', '淹水', '崩塌', '塞車', '延誤',
+    '遭轟', '挨轟', '痛批', '怒轟', '砲轟', '抨擊'
+  ];
+  const weakNegative = ['批評', '質疑', '不滿', '抗議', '反彈', '爭議', '問題', '不足', '怠惰', '失職', '不當'];
+  const positive = [
+    '推薦', '好評', '獲獎', '開幕', '啟用', '完工', '改善', '提升', '亮點', '新亮點',
+    '活化', '蛻變', '推動', '加碼', '補助', '合作', '成功', '首創', '入選', '滿意',
+    '值得', '好吃', '好玩', '漂亮', '平安', '祈福', '祝福'
+  ];
+  const improvementContext = [
+    '關切', '祈求平安', '強調防災', '防災提升', '提升城市韌性', '城市韌性',
+    '複合式防災', '慰問', '救災', '復原', '演練', '捐贈', '協助', '說明防災',
+    '防災教育', '拚防災', '防災顧問', '當顧問', '閒置空間', '原民產業基地'
+  ];
+
+  if (hasAny(titleText, strongNegative)) return 'negative';
+  if ((hasAny(titleText, positive) || hasAny(titleText, improvementContext)) && !hasAny(titleText, weakNegative)) {
+    return hasAny(titleText, positive) ? 'positive' : 'neutral';
+  }
+  if (hasAny(titleText, weakNegative)) return 'negative';
+  if (hasAny(allText, strongNegative)) return 'negative';
+  if (hasAny(titleText, positive)) return 'positive';
+  return 'neutral';
+}
+
 export function estimateImportance(category, title = '', snippet = '') {
   const text = `${title} ${snippet}`;
   if (category === '災害' || ['緊急', '災情', '封路', '地震', '颱風'].some((word) => text.includes(word))) {
@@ -272,7 +308,7 @@ export function normalizeArticle(item) {
   const title = cleanText(item.title || '');
   const snippet = cleanText(item.snippet || item.summary || '');
   const category = item.category || classifyArticle(title, snippet);
-  const sentiment = item.sentiment || estimateSentiment(title, snippet);
+  const sentiment = item.sentiment || estimateTitleFirstSentiment(title, snippet);
 
   return {
     title: title || item.url,
