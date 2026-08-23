@@ -118,11 +118,51 @@ function isUrlLikeTitle(article) {
   return false;
 }
 
+function isNonArticleLandingPage(article) {
+  const title = String(article.title || '').trim();
+  const text = articleRelevanceText(article);
+  const urlText = String(article.url || '').trim().toLowerCase();
+
+  const nonArticleTitlePatterns = [
+    /圖書館$/,
+    /資料庫$/,
+    /搜尋$/,
+    /首頁$/,
+    /官方網站$/,
+    /入口網$/,
+    /服務網$/,
+    /觀光資訊網$/,
+    /國立.*圖書館/,
+    /library/i
+  ];
+  if (nonArticleTitlePatterns.some((pattern) => pattern.test(title))) return true;
+
+  const nonArticleTextWords = [
+    '館藏查詢', '電子資源', '資料庫檢索', '讀者服務', '借閱服務',
+    '開館時間', '館舍資訊', '館藏系統'
+  ];
+  if (nonArticleTextWords.some((word) => text.includes(word.replace(/\s+/g, '').toLowerCase()))) return true;
+
+  try {
+    const url = new URL(urlText);
+    const path = url.pathname.replace(/\/+$/, '').toLowerCase();
+    const search = url.search.toLowerCase();
+    if (!path || path === '') return true;
+    if (/\/(search|tag|tags|category|categories|topics?|list|lists|archive|archives|author|authors)$/.test(path)) return true;
+    if (search && /(q=|query=|keyword=|search=|s=)/.test(search)) return true;
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
 function isDisplayableLatestArticle(article, keywords) {
   if (article.platform === 'google_reviews') return false;
   if (isPromotionalArticle(article)) return false;
   if (!isRecentByPublishedAt(article, 14)) return false;
   if (isUrlLikeTitle(article)) return false;
+  if (isNonArticleLandingPage(article)) return false;
   return matchesTextKeyword(article, keywords);
 }
 
