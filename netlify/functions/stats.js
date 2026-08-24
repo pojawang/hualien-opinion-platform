@@ -26,6 +26,33 @@ const DEFAULT_FACEBOOK_KEYWORDS = [
   '洄瀾'
 ];
 
+const HUALIEN_RELEVANCE_TERMS = [
+  ...DEFAULT_FACEBOOK_KEYWORDS,
+  '花蓮人',
+  '花蓮大小事',
+  '花蓮爆料',
+  '花蓮同鄉會',
+  '今日花蓮',
+  '洄瀾灣',
+  '美崙',
+  '豐濱',
+  '鳳林',
+  '卓溪',
+  '萬榮',
+  '秀林',
+  '富里',
+  '豐田',
+  '光復糖廠',
+  '東華大學',
+  '慈濟',
+  '門諾',
+  '魏嘉賢',
+  '游淑貞',
+  '張峻',
+  '傅崐萁',
+  '徐榛蔚'
+];
+
 function countBy(items, key, fallback = '其他') {
   const map = new Map();
   for (const item of items) {
@@ -113,9 +140,14 @@ function articleRelevanceText(article) {
 function isUrlLikeTitle(article) {
   const title = String(article.title || '').trim();
   if (!title) return true;
+  if (title === '[object Object]') return true;
   if (/^https?:\/\//i.test(title)) return true;
   if (article.url && title === String(article.url).trim()) return true;
   return false;
+}
+
+function isHualienRelatedArticle(article) {
+  return matchesTextKeyword(article, HUALIEN_RELEVANCE_TERMS);
 }
 
 function isNonArticleLandingPage(article) {
@@ -163,6 +195,7 @@ function isDisplayableLatestArticle(article, keywords) {
   if (!isRecentByPublishedAt(article, 14)) return false;
   if (isUrlLikeTitle(article)) return false;
   if (isNonArticleLandingPage(article)) return false;
+  if (!isHualienRelatedArticle(article)) return false;
   return matchesTextKeyword(article, keywords);
 }
 
@@ -464,7 +497,11 @@ function buildDailySummary(todayArticles, keyword, popularKeywords, negativeAler
 }
 
 function buildYouTubeStats(articles) {
-  const videos = articles.filter((item) => item.platform === 'youtube');
+  const videos = articles.filter((item) =>
+    item.platform === 'youtube'
+    && !isUrlLikeTitle(item)
+    && isHualienRelatedArticle(item)
+  );
   const channelMap = new Map();
 
   for (const video of videos) {
