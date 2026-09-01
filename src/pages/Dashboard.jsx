@@ -21,6 +21,8 @@ import {
   cleanArticleText,
   importanceLabel,
   localizeSentimentCounts,
+  publishedAtLabel,
+  sentimentLabel,
   sourceTypeLabel
 } from '../lib/labels.js';
 
@@ -32,6 +34,9 @@ const sectionOptions = [
   ['overview', '狀態總覽'],
   ['summary', 'AI 每日摘要'],
   ['election', '花蓮縣長選情輿情摘要'],
+  ['electionWeiArticles', '魏嘉賢相關文章'],
+  ['electionYuArticles', '游淑貞相關文章'],
+  ['electionChangArticles', '張峻相關文章'],
   ['trend', '聲量與情緒'],
   ['keywords', '關鍵字與負評'],
   ['facebook', 'Facebook 分析'],
@@ -151,6 +156,34 @@ function ElectionSummaryPanel({ items = [], meta = {} }) {
   );
 }
 
+function CandidateArticlesPanel({ item }) {
+  const articles = item?.relatedArticles || [];
+  const title = item?.keyword || '候選人';
+
+  return (
+    <section className="panel candidateArticlesPanel">
+      <div className="sectionHeading">
+        <div className="panelTitle">
+          <span className="panelAccent blue" />
+          <h3>{title}相關文章</h3>
+        </div>
+        <span>{numberFormat.format(Number(item?.total) || 0)} 則</span>
+      </div>
+      <PagedItems items={articles} className="warningList">
+        {(article) => (
+          <a key={`${article.url || article.title}-${article.published_at || ''}`} href={article.url || '#'} target="_blank" rel="noreferrer">
+            <span>{cleanArticleText(article.title, '未命名文章')}</span>
+            <small>
+              {cleanArticleText(article.source, '未知來源')} · {publishedAtLabel(article.published_at)} · 判斷：{sentimentLabel(article.sentiment)}
+            </small>
+          </a>
+        )}
+      </PagedItems>
+      {articles.length === 0 && <p className="emptyState">目前沒有{title}相關文章。</p>}
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
@@ -200,6 +233,8 @@ export default function Dashboard() {
   const statusTotal = Number(stats.pendingCount || 0) + Number(stats.approvedCount || 0) + Number(stats.rejectedCount || 0);
   const approvedRate = statusTotal ? Math.round((Number(stats.approvedCount || 0) / statusTotal) * 100) : 0;
   const warningLevel = Number(stats.negativeAlerts?.length || 0) > 0 ? '需要留意' : '穩定';
+  const electionByKeyword = Object.fromEntries((stats.electionSummary || []).map((item) => [item.keyword, item]));
+  const showCandidateArticles = visibleSections.electionWeiArticles || visibleSections.electionYuArticles || visibleSections.electionChangArticles;
 
   return (
     <div className="pageStack dashboardPage">
@@ -276,6 +311,11 @@ export default function Dashboard() {
       <div hidden={!visibleSections.election}>
         <ElectionSummaryPanel items={stats.electionSummary || []} meta={stats.electionSummaryMeta || {}} />
       </div>
+      <section className="candidateArticlesGrid" hidden={!showCandidateArticles}>
+        {visibleSections.electionWeiArticles && <CandidateArticlesPanel item={electionByKeyword['魏嘉賢']} />}
+        {visibleSections.electionYuArticles && <CandidateArticlesPanel item={electionByKeyword['游淑貞']} />}
+        {visibleSections.electionChangArticles && <CandidateArticlesPanel item={electionByKeyword['張峻']} />}
+      </section>
       <section className="chartGrid" hidden={!visibleSections.trend}>
         <div className="panel analyticsPanel">
           <div className="panelTitle">

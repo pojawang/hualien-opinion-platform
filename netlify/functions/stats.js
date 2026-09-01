@@ -782,12 +782,42 @@ function dedupeElectionItems(items) {
   return Array.from(map.values());
 }
 
+function latestArticleDedupKey(item) {
+  const title = String(item.title || '')
+    .replace(/\s+/g, '')
+    .replace(/(?:\||｜|－|-|—|–).{2,40}$/u, '')
+    .toLowerCase();
+  if (title.length >= 8) return `title:${title}`;
+
+  try {
+    const url = new URL(String(item.url || ''));
+    url.hash = '';
+    url.search = '';
+    return `url:${url.toString().toLowerCase()}`;
+  } catch {
+    return `fallback:${String(item.url || item.id || item.external_id || title)}`;
+  }
+}
+
+function dedupeLatestArticles(items) {
+  const map = new Map();
+  for (const item of items) {
+    const key = latestArticleDedupKey(item);
+    if (!key || map.has(key)) continue;
+    map.set(key, item);
+  }
+  return Array.from(map.values());
+}
+
 function electionEventRow(item, keyword = '') {
   return {
     title: item.title || '未命名事件',
     source: item.source || item.source_name || item.platform || '未知來源',
     sentiment: electionSentiment(item, keyword),
-    url: item.url || ''
+    url: item.url || '',
+    published_at: item.published_at || item.created_at || '',
+    category: item.category || '其他',
+    importance: item.importance || 'medium'
   };
 }
 
@@ -862,6 +892,11 @@ function buildElectionSummary(articles, socialPosts) {
     },
     items: ELECTION_KEYWORDS.map((keyword) => {
     const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
+    const relatedArticles = matched
+      .slice()
+      .sort(sortElectionEvents)
+      .slice(0, 20)
+      .map((item) => electionEventRow(item, keyword));
     const negativeEvents = matched
       .filter((item) => electionSentiment(item, keyword) === 'negative')
       .slice()
@@ -885,6 +920,7 @@ function buildElectionSummary(articles, socialPosts) {
       negativePercent: percentage(counts.negative, total),
       favorability: favorabilityValue(counts.positive, counts.negative),
       peak: buildPeakSummary(keyword, matched),
+      relatedArticles,
       negativeEvents
     };
     })
@@ -1042,10 +1078,11 @@ export async function handler(event) {
       dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords, negativeAlerts),
       electionSummary: electionSummary.items,
       electionSummaryMeta: electionSummary.meta,
-      latestArticles: articles
-        .filter((item) => isDisplayableLatestArticle(item, selectedKeyword ? [selectedKeyword] : relevanceKeywords))
-        .sort((a, b) => effectiveTimestamp(b) - effectiveTimestamp(a))
-        .slice(0, 10)
+      latestArticles: dedupeLatestArticles(
+        articles
+          .filter((item) => isDisplayableLatestArticle(item, selectedKeyword ? [selectedKeyword] : relevanceKeywords))
+          .sort((a, b) => effectiveTimestamp(b) - effectiveTimestamp(a))
+      ).slice(0, 10)
     });
   } catch (err) {
     const status = err.message === '尚未登入' ? 401 : 500;

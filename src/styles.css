@@ -471,6 +471,20 @@ a {
   margin: 0;
 }
 
+.candidateArticlesGrid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.candidateArticlesPanel {
+  align-content: start;
+}
+
+.candidateArticlesPanel .warningList a {
+  min-height: 78px;
+}
+
 .negativeEventsTitle {
   color: #991b1b;
   font-size: 15px;
