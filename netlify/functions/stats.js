@@ -189,12 +189,53 @@ function isNonArticleLandingPage(article) {
   return false;
 }
 
+function isSocialContentPlatform(platform = '') {
+  return ['facebook_page', 'facebook_group', 'dcard', 'ptt', 'youtube'].includes(String(platform || '').toLowerCase());
+}
+
+function isNewsContentPlatform(platform = '') {
+  return ['news', 'google_news', 'rss', 'sitemap'].includes(String(platform || '').toLowerCase());
+}
+
+function isNewsLikeArticle(article) {
+  const source = String(article.source || article.source_name || '').trim();
+  const title = String(article.title || '').trim();
+  const urlText = String(article.url || '').trim();
+  const mediaSignals = /(新聞|日報|時報|電視|報導|通訊社|中央社|聯合報|自由時報|中時|三立|民視|TVBS|東森|華視|公視|鏡新聞|更生|Yahoo|Nownews|NOWNEWS|UDN|CNA|ETtoday|PChome|風傳媒|報新聞|886)/i;
+
+  if (mediaSignals.test(`${source} ${title}`)) return true;
+
+  try {
+    const url = new URL(urlText);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    const path = url.pathname.toLowerCase();
+    const newsDomains = [
+      'udn.com', 'nownews.com', 'cna.com.tw', 'ltn.com.tw', 'ettoday.net',
+      'chinatimes.com', 'ctee.com.tw', 'setn.com', 'tvbs.com.tw', 'ftvnews.com.tw',
+      'storm.mg', 'yahoo.com', 'ebc.net.tw', 'pts.org.tw', 'rti.org.tw',
+      'pchome.com.tw', 'mirrormedia.mg', '886.news', 'ksnews.com.tw',
+      'hsnews.com.tw', 'hualiennews.com'
+    ];
+    if (newsDomains.some((domain) => host === domain || host.endsWith(`.${domain}`))) return true;
+    return /\/(news|article|story|archives?|posts?)\/|\/\d{4}\/\d{1,2}\/\d{1,2}\/|\/\d{5,}(?:\/|$)/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
+function isNewsOrSocialContent(article) {
+  const platform = article.platform || '';
+  if (isSocialContentPlatform(platform) || isNewsContentPlatform(platform)) return true;
+  return isNewsLikeArticle(article);
+}
+
 function isDisplayableLatestArticle(article, keywords) {
   if (article.platform === 'google_reviews') return false;
   if (isPromotionalArticle(article)) return false;
   if (!isRecentByPublishedAt(article, 14)) return false;
   if (isUrlLikeTitle(article)) return false;
   if (isNonArticleLandingPage(article)) return false;
+  if (!isNewsOrSocialContent(article)) return false;
   if (!isHualienRelatedArticle(article)) return false;
   return matchesTextKeyword(article, keywords);
 }
