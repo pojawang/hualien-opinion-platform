@@ -43,7 +43,11 @@ export async function handler(event) {
     if (event.httpMethod === 'GET') {
       const { data, error } = await supabase.from('facebook_pages').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      return json(200, { pages: data || [] });
+      const pages = (data || []).map((page) => ({
+        ...page,
+        page_name: preferredFacebookName(page.page_url) || page.page_name
+      }));
+      return json(200, { pages });
     }
 
     if (event.httpMethod === 'POST') {
