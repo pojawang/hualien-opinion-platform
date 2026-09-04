@@ -854,7 +854,7 @@ function dedupeLatestArticles(items) {
 function electionEventRow(item, keyword = '') {
   return {
     title: item.title || '未命名事件',
-    source: item.source || item.source_name || item.platform || '未知來源',
+    source: isFacebookPlatform(item.platform) ? facebookDisplaySource(item) : item.source || item.source_name || item.platform || '未知來源',
     sentiment: electionSentiment(item, keyword),
     url: item.url || '',
     published_at: item.published_at || item.created_at || '',

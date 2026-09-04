@@ -308,7 +308,7 @@ function toArticleRow(item, sources, type, keywords = DEFAULT_FACEBOOK_KEYWORDS)
     id: crypto.randomUUID(),
     title,
     url,
-    source: source?.page_name || textValue(item.pageName, item.profileName, item.groupName, 'Facebook'),
+    source: preferredFacebookName(url) || source?.page_name || textValue(item.pageName, item.profileName, item.groupName, 'Facebook'),
     platform,
     category: configuredCategory(source, category),
     snippet: content,
