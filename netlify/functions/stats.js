@@ -442,7 +442,12 @@ function isPromotionalArticle(article) {
     /賞屋/,
     /開價/,
     /總價/,
+    /含車位/,
+    /好停車/,
     /坪數/,
+    /[0-9]+(?:\.[0-9]+)?坪/,
+    /[0-9]+房/,
+    /[0-9]+(?:\.[0-9]+)?萬/,
     /每坪/,
     /車位/,
     /屋主自售/,
@@ -1065,6 +1070,7 @@ export async function handler(event) {
       .map(withDashboardSentiment)
       .filter((item) => {
         if (item.sentiment !== 'negative') return false;
+        if (isPromotionalArticle(item)) return false;
         if (!isTopicRelevantArticle(item, alertKeywords)) return false;
         const timestamp = publishedTimestamp(item.published_at);
         return timestamp !== null
