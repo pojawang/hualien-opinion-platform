@@ -245,6 +245,13 @@ function isTopicRelevantArticle(article, keywords) {
   return matchesTextKeyword(article, keywords);
 }
 
+function isNegativeAlertRelevant(article, keywords, selectedKeyword = '') {
+  if (isUrlLikeTitle(article)) return false;
+  if (!isHualienRelatedArticle(article)) return false;
+  if (selectedKeyword) return matchesTextKeyword(article, [selectedKeyword]);
+  return matchesTextKeyword(article, keywords);
+}
+
 const NEGATIVE_ALERT_SIGNAL_WORDS = [
   '批評', '質疑', '不滿', '抗議', '怒轟', '砲轟', '痛批', '遭轟', '挨轟',
   '爭議', '涉案', '違法', '黑箱', '失言', '弊案', '貪污', '詐騙',
@@ -1042,7 +1049,7 @@ export async function handler(event) {
     const negativeArticles = [
       ...(negativeResult.data || []).map(withDashboardSentiment),
       ...allArticles.filter((item) => item.sentiment === 'negative')
-    ].filter((item) => isRelevantArticle(item) && isTopicRelevantArticle(item, alertKeywords));
+    ].filter((item) => isRelevantArticle(item) && isNegativeAlertRelevant(item, alertKeywords, selectedKeyword));
     const facebookArticles = selectedKeyword
       ? (facebookResult.data || []).filter((item) => isRelevantArticle(item) && matchesKeyword(item, selectedKeyword))
       : (facebookResult.data || []).filter(isRelevantArticle);
@@ -1071,7 +1078,7 @@ export async function handler(event) {
       .filter((item) => {
         if (item.sentiment !== 'negative') return false;
         if (isPromotionalArticle(item)) return false;
-        if (!isTopicRelevantArticle(item, alertKeywords)) return false;
+        if (!isNegativeAlertRelevant(item, alertKeywords, selectedKeyword)) return false;
         const timestamp = publishedTimestamp(item.published_at);
         return timestamp !== null
           && timestamp >= negativeCutoff.getTime()
