@@ -595,5 +595,6 @@ export async function handler(event) {
 }
 
 export const config = {
-  schedule: '@daily'
+  // Netlify cron uses UTC. 00:00 UTC is 08:00 in Asia/Taipei.
+  schedule: '0 0 * * *'
 };

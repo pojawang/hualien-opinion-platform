@@ -36,8 +36,11 @@ async function triggerPlaywrightFallback() {
 
 export async function handler(event) {
   try {
-    if (!(await isAdminRequest(event))) return json(403, { error: '僅管理員可啟動 Facebook 巡查' });
-    if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
+    const isScheduled = event.httpMethod === undefined || event.headers?.['x-netlify-scheduled'] === 'true';
+    if (!isScheduled && !(await isAdminRequest(event))) {
+      return json(403, { error: '僅管理員可啟動 Facebook 巡查' });
+    }
+    if (!isScheduled && event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
     if (apifyConfigured()) {
       try {
@@ -73,3 +76,8 @@ export async function handler(event) {
     return json(status, { error: error.message });
   }
 }
+
+export const config = {
+  // Netlify cron uses UTC. 00:00 UTC is 08:00 in Asia/Taipei.
+  schedule: '0 0 * * *'
+};
