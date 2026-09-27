@@ -76,8 +76,3 @@ export async function handler(event) {
     return json(status, { error: error.message });
   }
 }
-
-export const config = {
-  // Netlify cron uses UTC. 00:00 UTC is 08:00 in Asia/Taipei.
-  schedule: '0 0 * * *'
-};

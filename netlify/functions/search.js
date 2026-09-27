@@ -498,7 +498,7 @@ export async function handler(event) {
       return json(405, { error: 'Method not allowed' });
     }
 
-    const body = isScheduled ? {} : parseBody(event);
+    const body = isScheduled ? (event.scheduledBody || {}) : parseBody(event);
     const requestedMode = String(body.mode || 'all');
     const mode = ['web', 'videos', 'sources'].includes(requestedMode) ? requestedMode : 'all';
 
@@ -593,8 +593,3 @@ export async function handler(event) {
     return json(status, { error: err.message });
   }
 }
-
-export const config = {
-  // Netlify cron uses UTC. 00:00 UTC is 08:00 in Asia/Taipei.
-  schedule: '0 0 * * *'
-};

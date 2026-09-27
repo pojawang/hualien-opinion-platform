@@ -10,3 +10,10 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[functions."daily-collection-scheduled"]
+  # Netlify cron uses UTC. 00:00 UTC is 08:00 in Asia/Taipei.
+  schedule = "0 0 * * *"
+
+[functions."daily-collection-background"]
+  background = true

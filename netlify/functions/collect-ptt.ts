@@ -35,7 +35,3 @@ export async function handler(event: any) {
     return json(status, { error: error.message });
   }
 }
-
-export const config = {
-  schedule: '@daily'
-};

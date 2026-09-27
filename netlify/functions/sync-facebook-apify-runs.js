@@ -23,8 +23,3 @@ export async function handler(event) {
     return json(status, { error: error.message });
   }
 }
-
-export const config = {
-  // Retry importing asynchronous Apify runs after the 08:00 Asia/Taipei start.
-  schedule: '5,15,30 0 * * *'
-};
