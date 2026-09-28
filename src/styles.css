@@ -316,6 +316,10 @@ a {
   grid-template-columns: 1.4fr 1fr;
 }
 
+.chartGrid.singleChart {
+  grid-template-columns: 1fr;
+}
+
 .dashboardDisplayControls {
   display: grid;
   gap: 12px;
@@ -369,6 +373,14 @@ a {
 .electionPanel {
   background: #fff;
   border-left: 5px solid #2563eb;
+}
+
+.electionCharts {
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.8fr);
+}
+
+.electionChartPanel {
+  min-width: 0;
 }
 
 .electionGrid {

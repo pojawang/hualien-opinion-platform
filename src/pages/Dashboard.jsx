@@ -28,12 +28,19 @@ import {
 
 const pieColors = ['#0f766e', '#d97706', '#b91c1c'];
 const barColors = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#2563eb', '#7c3aed'];
+const candidateColors = {
+  '魏嘉賢': '#2563eb',
+  '游淑貞': '#0f766e',
+  '張峻': '#d97706'
+};
 const numberFormat = new Intl.NumberFormat('zh-TW');
 const PAGE_SIZE = 5;
 const sectionOptions = [
   ['overview', '狀態總覽'],
   ['summary', 'AI 每日摘要'],
   ['election', '花蓮縣長選情輿情摘要'],
+  ['electionTrend', '候選人聲量比較趨勢'],
+  ['electionNegativeComparison', '候選人負評比例比較'],
   ['electionWeiArticles', '魏嘉賢相關文章'],
   ['electionYuArticles', '游淑貞相關文章'],
   ['electionChangArticles', '張峻相關文章'],
@@ -234,6 +241,7 @@ export default function Dashboard() {
   const approvedRate = statusTotal ? Math.round((Number(stats.approvedCount || 0) / statusTotal) * 100) : 0;
   const warningLevel = Number(stats.negativeAlerts?.length || 0) > 0 ? '需要留意' : '穩定';
   const electionByKeyword = Object.fromEntries((stats.electionSummary || []).map((item) => [item.keyword, item]));
+  const electionChartCount = Number(visibleSections.electionTrend) + Number(visibleSections.electionNegativeComparison);
   const showCandidateArticles = visibleSections.electionWeiArticles || visibleSections.electionYuArticles || visibleSections.electionChangArticles;
 
   return (
@@ -311,6 +319,69 @@ export default function Dashboard() {
       <div hidden={!visibleSections.election}>
         <ElectionSummaryPanel items={stats.electionSummary || []} meta={stats.electionSummaryMeta || {}} />
       </div>
+      <section className={`chartGrid electionCharts${electionChartCount === 1 ? ' singleChart' : ''}`} hidden={electionChartCount === 0}>
+        {visibleSections.electionTrend && (
+          <div className="panel analyticsPanel electionChartPanel">
+            <div className="sectionHeading">
+              <div className="panelTitle">
+                <span className="panelAccent blue" />
+                <h3>三位候選人聲量比較趨勢</h3>
+              </div>
+              <span>{stats.electionSummaryMeta?.startDate || '近一週'} 至 {stats.electionSummaryMeta?.endDate || '今日'}</span>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={stats.electionVolumeTrend || []} margin={{ top: 18, right: 18, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip formatter={(value, name) => [`${value} 則`, name]} />
+                <Legend />
+                {Object.entries(candidateColors).map(([name, color]) => (
+                  <Line
+                    key={name}
+                    type="monotone"
+                    dataKey={name}
+                    name={name}
+                    stroke={color}
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 6 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {visibleSections.electionNegativeComparison && (
+          <div className="panel analyticsPanel electionChartPanel">
+            <div className="sectionHeading">
+              <div className="panelTitle">
+                <span className="panelAccent red" />
+                <h3>候選人負評比例比較</h3>
+              </div>
+              <span>負面則數 ÷ 總聲量</span>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={stats.electionNegativeComparison || []} margin={{ top: 18, right: 18, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
+                <XAxis dataKey="name" />
+                <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+                <Tooltip
+                  formatter={(value, name, item) => [
+                    `${value}%（${item.payload.negativeCount || 0} / ${item.payload.total || 0} 則）`,
+                    name
+                  ]}
+                />
+                <Bar dataKey="negativePercent" name="負評比例" radius={[5, 5, 0, 0]} maxBarSize={72}>
+                  {(stats.electionNegativeComparison || []).map((item) => (
+                    <Cell key={item.name} fill={candidateColors[item.name] || '#b91c1c'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
       <section className="candidateArticlesGrid" hidden={!showCandidateArticles}>
         {visibleSections.electionWeiArticles && <CandidateArticlesPanel item={electionByKeyword['魏嘉賢']} />}
         {visibleSections.electionYuArticles && <CandidateArticlesPanel item={electionByKeyword['游淑貞']} />}

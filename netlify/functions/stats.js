@@ -923,6 +923,32 @@ function buildPeakSummary(keyword, items) {
   };
 }
 
+function buildElectionVolumeTrend(candidateItems) {
+  // A rolling seven-day window can touch eight calendar dates. Keep both edge
+  // dates so the chart totals stay identical to the election summary totals.
+  const days = Array.from({ length: ELECTION_RECENT_DAYS + 1 }, (_, index) => {
+    const date = new Date(Date.now() - (ELECTION_RECENT_DAYS - index) * 86400000);
+    const key = dateKey(date);
+    return {
+      key,
+      name: key.slice(5).replace('-', '/'),
+      ...Object.fromEntries(ELECTION_KEYWORDS.map((keyword) => [keyword, 0]))
+    };
+  });
+  const dayMap = new Map(days.map((day) => [day.key, day]));
+
+  for (const [keyword, items] of candidateItems) {
+    for (const item of items) {
+      const timestamp = effectiveTimestamp(item);
+      if (!timestamp) continue;
+      const day = dayMap.get(dateKey(timestamp));
+      if (day) day[keyword] += 1;
+    }
+  }
+
+  return days.map(({ key, ...day }) => day);
+}
+
 function buildElectionSummary(articles, socialPosts) {
   const startDate = new Date(Date.now() - ELECTION_RECENT_DAYS * 86400000);
   const normalizedPosts = (socialPosts || []).map((post) => ({
@@ -937,15 +963,12 @@ function buildElectionSummary(articles, socialPosts) {
     .filter((item) => isRecentByPublishedAt(item, ELECTION_RECENT_DAYS))
     .filter((item) => !isPromotionalArticle(item));
 
-  return {
-    meta: {
-      startDate: dateKey(startDate),
-      endDate: dateKey(),
-      days: ELECTION_RECENT_DAYS,
-      note: '近 7 天，含新聞、一般網站、RSS、YouTube、Facebook、Dcard、PTT；排除廣告文並依標題/網址去重。'
-    },
-    items: ELECTION_KEYWORDS.map((keyword) => {
-    const matched = dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)));
+  const candidateItems = new Map(ELECTION_KEYWORDS.map((keyword) => [
+    keyword,
+    dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)))
+  ]));
+  const items = ELECTION_KEYWORDS.map((keyword) => {
+    const matched = candidateItems.get(keyword) || [];
     const relatedArticles = matched
       .slice()
       .sort(sortElectionEvents)
@@ -977,7 +1000,23 @@ function buildElectionSummary(articles, socialPosts) {
       relatedArticles,
       negativeEvents
     };
-    })
+  });
+
+  return {
+    meta: {
+      startDate: dateKey(startDate),
+      endDate: dateKey(),
+      days: ELECTION_RECENT_DAYS,
+      note: '近 7 天，含新聞、一般網站、RSS、YouTube、Facebook、Dcard、PTT；排除廣告文並依標題/網址去重。'
+    },
+    items,
+    volumeTrend: buildElectionVolumeTrend(candidateItems),
+    negativeComparison: items.map((item) => ({
+      name: item.keyword,
+      negativeCount: item.negativeCount,
+      total: item.total,
+      negativePercent: item.negativePercent
+    }))
   };
 }
 
@@ -1133,6 +1172,8 @@ export async function handler(event) {
       dailySummary: buildDailySummary(todayArticles, selectedKeyword, popularKeywords, negativeAlerts),
       electionSummary: electionSummary.items,
       electionSummaryMeta: electionSummary.meta,
+      electionVolumeTrend: electionSummary.volumeTrend,
+      electionNegativeComparison: electionSummary.negativeComparison,
       latestArticles: dedupeLatestArticles(
         articles
           .filter((item) => isDisplayableLatestArticle(item, selectedKeyword ? [selectedKeyword] : relevanceKeywords))
