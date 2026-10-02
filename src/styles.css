@@ -383,6 +383,172 @@ a {
   min-width: 0;
 }
 
+.electionMetricGrid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.electionMetricPanel {
+  min-width: 0;
+}
+
+.momentumList {
+  display: grid;
+  gap: 0;
+  margin-top: 8px;
+}
+
+.momentumRow {
+  align-items: center;
+  border-bottom: 1px solid #e5eeeb;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  min-height: 66px;
+  padding: 10px 0;
+}
+
+.momentumRow:last-child {
+  border-bottom: 0;
+}
+
+.momentumRow > i {
+  border-radius: 999px;
+  display: block;
+  height: 36px;
+  width: 6px;
+}
+
+.momentumRow > div {
+  display: grid;
+  gap: 4px;
+}
+
+.momentumRow strong {
+  color: #10201d;
+  font-size: 17px;
+}
+
+.momentumRow small {
+  color: #64736f;
+  font-weight: 700;
+}
+
+.momentumValue {
+  background: #edf7f4;
+  border-radius: 999px;
+  color: #52615d;
+  font-size: 15px;
+  min-width: 68px;
+  padding: 7px 9px;
+  text-align: center;
+}
+
+.momentumValue.up,
+.momentumValue.new {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.momentumValue.down {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.electionTopicPanel,
+.electionTimelinePanel {
+  min-width: 0;
+}
+
+.electionTimeline {
+  display: grid;
+  margin-top: 4px;
+}
+
+.electionTimeline article {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 86px 14px minmax(0, 1fr);
+  min-height: 94px;
+  position: relative;
+}
+
+.electionTimeline article:not(:last-child)::after {
+  background: #dcebe7;
+  content: "";
+  left: 92px;
+  position: absolute;
+  top: 25px;
+  bottom: 0;
+  width: 2px;
+}
+
+.electionTimeline time {
+  color: #52615d;
+  font-size: 13px;
+  font-weight: 900;
+  padding-top: 4px;
+  text-align: right;
+}
+
+.electionTimeline article > i {
+  background: var(--candidate-color, #64748b);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--candidate-color, #64748b);
+  display: block;
+  height: 12px;
+  margin-top: 5px;
+  position: relative;
+  width: 12px;
+  z-index: 1;
+}
+
+.electionTimeline article > div {
+  border-bottom: 1px solid #e5eeeb;
+  display: grid;
+  gap: 7px;
+  padding: 0 0 16px;
+}
+
+.electionTimeline article:last-child > div {
+  border-bottom: 0;
+}
+
+.timelineMeta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.timelineMeta strong {
+  color: #10201d;
+  font-size: 16px;
+}
+
+.timelineMeta > span:not(.sentimentPill) {
+  background: #eef8f6;
+  border-radius: 999px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 5px 8px;
+}
+
+.electionTimeline h4 {
+  color: #17302b;
+  font-size: 16px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.electionTimeline small {
+  color: #64736f;
+  font-weight: 700;
+}
+
 .electionGrid {
   display: grid;
   gap: 14px;
@@ -1032,6 +1198,7 @@ a {
   .statsGrid,
   .chartGrid,
   .electionGrid,
+  .electionMetricGrid,
   .formGrid,
   .facebookPageForm,
   .facebookPageRow,
@@ -1055,5 +1222,14 @@ a {
 
   .navbar nav {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .electionTimeline article {
+    gap: 10px;
+    grid-template-columns: 72px 12px minmax(0, 1fr);
+  }
+
+  .electionTimeline article:not(:last-child)::after {
+    left: 78px;
   }
 }

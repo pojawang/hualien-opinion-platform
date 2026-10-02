@@ -41,6 +41,11 @@ const sectionOptions = [
   ['election', '花蓮縣長選情輿情摘要'],
   ['electionTrend', '候選人聲量比較趨勢'],
   ['electionNegativeComparison', '候選人負評比例比較'],
+  ['electionShare', '候選人聲量占比'],
+  ['electionMomentum', '候選人近 7 日增減率'],
+  ['electionNetSentiment', '候選人淨情緒指數'],
+  ['electionTopics', '候選人議題版圖'],
+  ['electionTimeline', '重大事件時間軸'],
   ['electionWeiArticles', '魏嘉賢相關文章'],
   ['electionYuArticles', '游淑貞相關文章'],
   ['electionChangArticles', '張峻相關文章'],
@@ -242,6 +247,9 @@ export default function Dashboard() {
   const warningLevel = Number(stats.negativeAlerts?.length || 0) > 0 ? '需要留意' : '穩定';
   const electionByKeyword = Object.fromEntries((stats.electionSummary || []).map((item) => [item.keyword, item]));
   const electionChartCount = Number(visibleSections.electionTrend) + Number(visibleSections.electionNegativeComparison);
+  const electionMetricCount = Number(visibleSections.electionShare)
+    + Number(visibleSections.electionMomentum)
+    + Number(visibleSections.electionNetSentiment);
   const showCandidateArticles = visibleSections.electionWeiArticles || visibleSections.electionYuArticles || visibleSections.electionChangArticles;
 
   return (
@@ -381,6 +389,141 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         )}
+      </section>
+      <section className="electionMetricGrid" hidden={electionMetricCount === 0}>
+        {visibleSections.electionShare && (
+          <div className="panel analyticsPanel electionMetricPanel">
+            <div className="sectionHeading">
+              <div className="panelTitle">
+                <span className="panelAccent blue" />
+                <h3>聲量占比</h3>
+              </div>
+              <span>近 7 日提及占比</span>
+            </div>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={stats.electionShareOfVoice || []}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={52}
+                  outerRadius={86}
+                  paddingAngle={2}
+                  label={({ name, payload }) => `${name} ${payload.sharePercent}%`}
+                >
+                  {(stats.electionShareOfVoice || []).map((item) => (
+                    <Cell key={item.name} fill={candidateColors[item.name] || '#64748b'} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value, name, item) => [`${value} 則（${item.payload.sharePercent}%）`, name]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {visibleSections.electionMomentum && (
+          <div className="panel analyticsPanel electionMetricPanel">
+            <div className="sectionHeading">
+              <div className="panelTitle">
+                <span className="panelAccent" />
+                <h3>近 7 日增減率</h3>
+              </div>
+              <span>相較前 7 日</span>
+            </div>
+            <div className="momentumList">
+              {(stats.electionMomentum || []).map((item) => (
+                <div className="momentumRow" key={item.name}>
+                  <i style={{ background: candidateColors[item.name] }} />
+                  <div>
+                    <strong>{item.name}</strong>
+                    <small>本期 {item.currentTotal} 則 · 前期 {item.previousTotal} 則</small>
+                  </div>
+                  <b className={`momentumValue ${item.changeState}`}>
+                    {item.changeState === 'new'
+                      ? '新增'
+                      : `${Number(item.changePercent) > 0 ? '+' : ''}${Number(item.changePercent || 0).toFixed(1)}%`}
+                  </b>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {visibleSections.electionNetSentiment && (
+          <div className="panel analyticsPanel electionMetricPanel">
+            <div className="sectionHeading">
+              <div className="panelTitle">
+                <span className="panelAccent amber" />
+                <h3>淨情緒指數</h3>
+              </div>
+              <span>正面% − 負面%</span>
+            </div>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={stats.electionNetSentiment || []} margin={{ top: 18, right: 12, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
+                <XAxis dataKey="name" />
+                <YAxis domain={[-100, 100]} tickFormatter={(value) => `${value}`} />
+                <Tooltip
+                  formatter={(value, name, item) => [
+                    `${Number(value).toFixed(1)}（正面 ${item.payload.positivePercent}% / 負面 ${item.payload.negativePercent}%）`,
+                    name
+                  ]}
+                />
+                <Bar dataKey="value" name="淨情緒指數" radius={[5, 5, 0, 0]} maxBarSize={62}>
+                  {(stats.electionNetSentiment || []).map((item) => (
+                    <Cell key={item.name} fill={candidateColors[item.name] || '#64748b'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+      <section className="panel electionTopicPanel" hidden={!visibleSections.electionTopics}>
+        <div className="sectionHeading">
+          <div className="panelTitle">
+            <span className="panelAccent purple" />
+            <h3>議題版圖</h3>
+          </div>
+          <span>近 7 日主要分類聲量</span>
+        </div>
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={stats.electionTopicComparison || []} margin={{ top: 16, right: 18, bottom: 4, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
+            <XAxis dataKey="name" />
+            <YAxis allowDecimals={false} />
+            <Tooltip formatter={(value, name) => [`${value} 則`, name]} />
+            <Legend />
+            {Object.entries(candidateColors).map(([name, color]) => (
+              <Bar key={name} dataKey={name} fill={color} radius={[4, 4, 0, 0]} maxBarSize={42} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </section>
+      <section className="panel electionTimelinePanel" hidden={!visibleSections.electionTimeline}>
+        <div className="sectionHeading">
+          <div className="panelTitle">
+            <span className="panelAccent red" />
+            <h3>重大事件時間軸</h3>
+          </div>
+          <span>依單日聲量與重要程度排序</span>
+        </div>
+        <div className="electionTimeline">
+          {(stats.electionEventTimeline || []).map((event, index) => (
+            <article key={`${event.keyword}-${event.date}-${event.title}-${index}`}>
+              <time>{event.date}</time>
+              <i style={{ '--candidate-color': candidateColors[event.keyword] || '#64748b' }} />
+              <div>
+                <div className="timelineMeta">
+                  <strong>{event.keyword}</strong>
+                  <span>{event.count} 則聲量</span>
+                  <span className={`sentimentPill ${event.sentiment}`}>{sentimentLabel(event.sentiment)}</span>
+                </div>
+                <h4>{cleanArticleText(event.title, '未命名事件')}</h4>
+                <small>{cleanArticleText(event.source, '未知來源')} · {event.category || '其他'}</small>
+              </div>
+            </article>
+          ))}
+        </div>
+        {(stats.electionEventTimeline || []).length === 0 && <p className="emptyState">近 7 日沒有可辨識的重大事件。</p>}
       </section>
       <section className="candidateArticlesGrid" hidden={!showCandidateArticles}>
         {visibleSections.electionWeiArticles && <CandidateArticlesPanel item={electionByKeyword['魏嘉賢']} />}

@@ -949,8 +949,99 @@ function buildElectionVolumeTrend(candidateItems) {
   return days.map(({ key, ...day }) => day);
 }
 
+function buildElectionShareOfVoice(items) {
+  const totalMentions = items.reduce((sum, item) => sum + item.total, 0);
+  return items.map((item) => ({
+    name: item.keyword,
+    value: item.total,
+    sharePercent: percentage(item.total, totalMentions)
+  }));
+}
+
+function buildElectionMomentum(candidateItems, previousCandidateItems) {
+  return ELECTION_KEYWORDS.map((keyword) => {
+    const currentTotal = (candidateItems.get(keyword) || []).length;
+    const previousTotal = (previousCandidateItems.get(keyword) || []).length;
+    let changePercent = 0;
+    let changeState = 'flat';
+
+    if (previousTotal === 0 && currentTotal > 0) {
+      changePercent = null;
+      changeState = 'new';
+    } else if (previousTotal > 0) {
+      changePercent = Math.round(((currentTotal - previousTotal) / previousTotal) * 1000) / 10;
+      changeState = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
+    }
+
+    return { name: keyword, currentTotal, previousTotal, changePercent, changeState };
+  });
+}
+
+function buildElectionTopicComparison(candidateItems) {
+  const categoryTotals = new Map();
+  const candidateCategoryCounts = new Map();
+
+  for (const [keyword, items] of candidateItems) {
+    const counts = new Map();
+    for (const item of items) {
+      const category = String(item.category || '其他').trim() || '其他';
+      counts.set(category, (counts.get(category) || 0) + 1);
+      categoryTotals.set(category, (categoryTotals.get(category) || 0) + 1);
+    }
+    candidateCategoryCounts.set(keyword, counts);
+  }
+
+  return Array.from(categoryTotals.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hant'))
+    .slice(0, 6)
+    .map(([category]) => ({
+      name: category,
+      ...Object.fromEntries(ELECTION_KEYWORDS.map((keyword) => [
+        keyword,
+        candidateCategoryCounts.get(keyword)?.get(category) || 0
+      ]))
+    }));
+}
+
+function buildElectionEventTimeline(candidateItems) {
+  const events = [];
+
+  for (const [keyword, items] of candidateItems) {
+    const dayMap = new Map();
+    for (const item of items) {
+      const timestamp = effectiveTimestamp(item);
+      const date = timestamp ? dateKey(timestamp) : '';
+      if (!date) continue;
+      const dayItems = dayMap.get(date) || [];
+      dayItems.push(item);
+      dayMap.set(date, dayItems);
+    }
+
+    for (const [date, dayItems] of dayMap) {
+      const representative = dayItems.slice().sort(sortElectionEvents)[0];
+      if (!representative) continue;
+      events.push({
+        date,
+        keyword,
+        count: dayItems.length,
+        ...electionEventRow(representative, keyword)
+      });
+    }
+  }
+
+  return events
+    .sort((a, b) => b.count - a.count
+      || (ELECTION_IMPORTANCE_WEIGHT[b.importance] || 0) - (ELECTION_IMPORTANCE_WEIGHT[a.importance] || 0)
+      || b.date.localeCompare(a.date))
+    .slice(0, 9)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.count - a.count);
+}
+
 function buildElectionSummary(articles, socialPosts) {
-  const startDate = new Date(Date.now() - ELECTION_RECENT_DAYS * 86400000);
+  const now = Date.now();
+  const currentCutoff = now - ELECTION_RECENT_DAYS * 86400000;
+  const previousCutoff = now - ELECTION_RECENT_DAYS * 2 * 86400000;
+  const startDate = new Date(currentCutoff);
   const normalizedPosts = (socialPosts || []).map((post) => ({
     ...post,
     platform: post.source,
@@ -958,14 +1049,25 @@ function buildElectionSummary(articles, socialPosts) {
     importance: post.importance || 'medium',
     created_at: post.created_at || post.published_at
   }));
-  const pool = [...articles, ...normalizedPosts]
+  const fullPool = [...articles, ...normalizedPosts]
     .filter((item) => item.url || item.title)
-    .filter((item) => isRecentByPublishedAt(item, ELECTION_RECENT_DAYS))
     .filter((item) => !isPromotionalArticle(item));
+  const pool = fullPool.filter((item) => {
+    const timestamp = effectiveTimestamp(item);
+    return timestamp >= currentCutoff && timestamp <= now + 86400000;
+  });
+  const previousPool = fullPool.filter((item) => {
+    const timestamp = effectiveTimestamp(item);
+    return timestamp >= previousCutoff && timestamp < currentCutoff;
+  });
 
   const candidateItems = new Map(ELECTION_KEYWORDS.map((keyword) => [
     keyword,
     dedupeElectionItems(pool.filter((item) => matchesKeyword(item, keyword)))
+  ]));
+  const previousCandidateItems = new Map(ELECTION_KEYWORDS.map((keyword) => [
+    keyword,
+    dedupeElectionItems(previousPool.filter((item) => matchesKeyword(item, keyword)))
   ]));
   const items = ELECTION_KEYWORDS.map((keyword) => {
     const matched = candidateItems.get(keyword) || [];
@@ -1002,6 +1104,8 @@ function buildElectionSummary(articles, socialPosts) {
     };
   });
 
+  const shareOfVoice = buildElectionShareOfVoice(items);
+
   return {
     meta: {
       startDate: dateKey(startDate),
@@ -1016,7 +1120,17 @@ function buildElectionSummary(articles, socialPosts) {
       negativeCount: item.negativeCount,
       total: item.total,
       negativePercent: item.negativePercent
-    }))
+    })),
+    shareOfVoice,
+    momentum: buildElectionMomentum(candidateItems, previousCandidateItems),
+    netSentiment: items.map((item) => ({
+      name: item.keyword,
+      value: Math.round((item.positivePercent - item.negativePercent) * 10) / 10,
+      positivePercent: item.positivePercent,
+      negativePercent: item.negativePercent
+    })),
+    topicComparison: buildElectionTopicComparison(candidateItems),
+    eventTimeline: buildElectionEventTimeline(candidateItems)
   };
 }
 
@@ -1174,6 +1288,11 @@ export async function handler(event) {
       electionSummaryMeta: electionSummary.meta,
       electionVolumeTrend: electionSummary.volumeTrend,
       electionNegativeComparison: electionSummary.negativeComparison,
+      electionShareOfVoice: electionSummary.shareOfVoice,
+      electionMomentum: electionSummary.momentum,
+      electionNetSentiment: electionSummary.netSentiment,
+      electionTopicComparison: electionSummary.topicComparison,
+      electionEventTimeline: electionSummary.eventTimeline,
       latestArticles: dedupeLatestArticles(
         articles
           .filter((item) => isDisplayableLatestArticle(item, selectedKeyword ? [selectedKeyword] : relevanceKeywords))
