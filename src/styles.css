@@ -440,9 +440,10 @@ a {
   border-radius: 999px;
   color: #52615d;
   font-size: 15px;
-  min-width: 68px;
+  min-width: 112px;
   padding: 7px 9px;
   text-align: center;
+  white-space: nowrap;
 }
 
 .momentumValue.up,
@@ -454,6 +455,31 @@ a {
 .momentumValue.down {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.engagementBreakdown {
+  border-top: 1px solid #e5eeeb;
+  display: grid;
+}
+
+.engagementBreakdown > div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 34px;
+}
+
+.engagementBreakdown strong {
+  color: #33413e;
+  font-size: 13px;
+}
+
+.engagementBreakdown span {
+  color: #64736f;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
 }
 
 .electionTopicPanel,
@@ -1231,5 +1257,15 @@ a {
 
   .electionTimeline article:not(:last-child)::after {
     left: 78px;
+  }
+
+  .momentumRow {
+    align-items: start;
+    grid-template-columns: 6px minmax(0, 1fr);
+  }
+
+  .momentumValue {
+    grid-column: 2;
+    justify-self: start;
   }
 }

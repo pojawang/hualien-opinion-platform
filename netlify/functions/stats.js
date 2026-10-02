@@ -973,7 +973,31 @@ function buildElectionMomentum(candidateItems, previousCandidateItems) {
       changeState = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
     }
 
-    return { name: keyword, currentTotal, previousTotal, changePercent, changeState };
+    return {
+      name: keyword,
+      currentTotal,
+      previousTotal,
+      difference: currentTotal - previousTotal,
+      changePercent,
+      changeState
+    };
+  });
+}
+
+function buildElectionEngagement(candidateItems) {
+  return ELECTION_KEYWORDS.map((keyword) => {
+    const totals = (candidateItems.get(keyword) || []).reduce((acc, item) => {
+      acc.likes += Number(item.like_count) || 0;
+      acc.comments += Number(item.comment_count) || 0;
+      acc.shares += Number(item.share_count) || 0;
+      return acc;
+    }, { likes: 0, comments: 0, shares: 0 });
+
+    return {
+      name: keyword,
+      ...totals,
+      score: totals.likes + totals.comments * 2 + totals.shares * 3
+    };
   });
 }
 
@@ -1129,6 +1153,7 @@ function buildElectionSummary(articles, socialPosts) {
       positivePercent: item.positivePercent,
       negativePercent: item.negativePercent
     })),
+    engagement: buildElectionEngagement(candidateItems),
     topicComparison: buildElectionTopicComparison(candidateItems),
     eventTimeline: buildElectionEventTimeline(candidateItems)
   };
@@ -1161,6 +1186,26 @@ function buildPopularKeywords(keywords, articles, socialPosts, selectedKeyword =
     .slice(0, 10);
 }
 
+async function fetchRecentElectionArticles(supabase, cutoff) {
+  const pageSize = 1000;
+  const rows = [];
+
+  for (let page = 0; page < 10; page += 1) {
+    const from = page * pageSize;
+    const result = await supabase
+      .from('articles')
+      .select('*')
+      .gte('created_at', cutoff.toISOString())
+      .order('created_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (result.error) throw result.error;
+    rows.push(...(result.data || []));
+    if ((result.data || []).length < pageSize) break;
+  }
+
+  return { data: rows, error: null };
+}
+
 export async function handler(event) {
   try {
     guard(event);
@@ -1169,19 +1214,22 @@ export async function handler(event) {
     const selectedKeyword = (params.keyword || '').trim();
     const today = dateKey();
     const negativeCutoff = new Date(Date.now() - 7 * 86400000);
+    const electionComparisonCutoff = new Date(Date.now() - ELECTION_RECENT_DAYS * 2 * 86400000);
 
-    const [articleResult, keywordResult, postResult, negativeResult, facebookResult] = await Promise.all([
+    const [articleResult, keywordResult, postResult, negativeResult, facebookResult, electionArticleResult] = await Promise.all([
       supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(1000),
       supabase.from('keywords').select('keyword').eq('enabled', true).order('keyword'),
       supabase.from('posts').select('*').in('source', ['dcard', 'ptt']).order('published_at', { ascending: false }).limit(1000),
       supabase.from('articles').select('*').eq('sentiment', 'negative').gte('created_at', negativeCutoff.toISOString()).order('created_at', { ascending: false }).limit(500),
-      supabase.from('articles').select('*').in('platform', ['facebook_page', 'facebook_group']).order('created_at', { ascending: false }).limit(1500)
+      supabase.from('articles').select('*').in('platform', ['facebook_page', 'facebook_group']).order('created_at', { ascending: false }).limit(1500),
+      fetchRecentElectionArticles(supabase, electionComparisonCutoff)
     ]);
     if (articleResult.error) throw articleResult.error;
     if (keywordResult.error) throw keywordResult.error;
     if (postResult.error && !['42P01', 'PGRST205'].includes(postResult.error.code)) throw postResult.error;
     if (negativeResult.error) throw negativeResult.error;
     if (facebookResult.error) throw facebookResult.error;
+    if (electionArticleResult.error) throw electionArticleResult.error;
 
     const keywords = (keywordResult.data || []).map((item) => item.keyword);
     const relevanceKeywords = [...new Set([...keywords, ...DEFAULT_FACEBOOK_KEYWORDS])]
@@ -1189,6 +1237,9 @@ export async function handler(event) {
       .filter(Boolean);
     const isRelevantArticle = (item) => !isFacebookPlatform(item.platform) || matchesTextKeyword(item, relevanceKeywords);
     const allArticles = (articleResult.data || [])
+      .filter(isRelevantArticle)
+      .map(withDashboardSentiment);
+    const electionArticles = (electionArticleResult.data || [])
       .filter(isRelevantArticle)
       .map(withDashboardSentiment);
     const articles = selectedKeyword
@@ -1246,7 +1297,7 @@ export async function handler(event) {
     const facebookStats = buildFacebookStats(facebookArticles, selectedKeyword ? 30 : 7);
     const dcardStats = buildDcardStats(filteredSocialPosts.filter((item) => item.source === 'dcard'), keywords);
     const pttStats = buildPttStats(filteredSocialPosts.filter((item) => item.source === 'ptt'), keywords);
-    const electionSummary = buildElectionSummary(allArticles, socialPosts);
+    const electionSummary = buildElectionSummary(electionArticles, socialPosts);
 
     return json(200, {
       keywords,
@@ -1291,6 +1342,7 @@ export async function handler(event) {
       electionShareOfVoice: electionSummary.shareOfVoice,
       electionMomentum: electionSummary.momentum,
       electionNetSentiment: electionSummary.netSentiment,
+      electionEngagement: electionSummary.engagement,
       electionTopicComparison: electionSummary.topicComparison,
       electionEventTimeline: electionSummary.eventTimeline,
       latestArticles: dedupeLatestArticles(

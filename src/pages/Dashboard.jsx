@@ -42,8 +42,9 @@ const sectionOptions = [
   ['electionTrend', '候選人聲量比較趨勢'],
   ['electionNegativeComparison', '候選人負評比例比較'],
   ['electionShare', '候選人聲量占比'],
-  ['electionMomentum', '候選人近 7 日增減率'],
+  ['electionMomentum', '候選人近 7 日聲量變化'],
   ['electionNetSentiment', '候選人淨情緒指數'],
+  ['electionEngagement', '候選人互動熱度比較'],
   ['electionTopics', '候選人議題版圖'],
   ['electionTimeline', '重大事件時間軸'],
   ['electionWeiArticles', '魏嘉賢相關文章'],
@@ -64,6 +65,14 @@ const defaultVisibleSections = Object.fromEntries(sectionOptions.map(([key]) => 
 function rankWidth(value, maxValue) {
   if (!maxValue) return '8%';
   return `${Math.max(8, Math.round((Number(value) / maxValue) * 100))}%`;
+}
+
+function momentumLabel(item) {
+  const difference = Number(item.difference) || 0;
+  if (item.previousTotal === 0 && item.currentTotal > 0) return `本週新增 ${item.currentTotal} 則`;
+  if (difference > 0) return `增加 ${difference} 則`;
+  if (difference < 0) return `減少 ${Math.abs(difference)} 則`;
+  return '與前期相同';
 }
 
 function initialVisibleSections() {
@@ -249,7 +258,8 @@ export default function Dashboard() {
   const electionChartCount = Number(visibleSections.electionTrend) + Number(visibleSections.electionNegativeComparison);
   const electionMetricCount = Number(visibleSections.electionShare)
     + Number(visibleSections.electionMomentum)
-    + Number(visibleSections.electionNetSentiment);
+    + Number(visibleSections.electionNetSentiment)
+    + Number(visibleSections.electionEngagement);
   const showCandidateArticles = visibleSections.electionWeiArticles || visibleSections.electionYuArticles || visibleSections.electionChangArticles;
 
   return (
@@ -425,9 +435,9 @@ export default function Dashboard() {
             <div className="sectionHeading">
               <div className="panelTitle">
                 <span className="panelAccent" />
-                <h3>近 7 日增減率</h3>
+                <h3>近 7 日聲量變化</h3>
               </div>
-              <span>相較前 7 日</span>
+              <span>直接比較則數</span>
             </div>
             <div className="momentumList">
               {(stats.electionMomentum || []).map((item) => (
@@ -435,12 +445,10 @@ export default function Dashboard() {
                   <i style={{ background: candidateColors[item.name] }} />
                   <div>
                     <strong>{item.name}</strong>
-                    <small>本期 {item.currentTotal} 則 · 前期 {item.previousTotal} 則</small>
+                    <small>前 7 日 {item.previousTotal} 則 → 近 7 日 {item.currentTotal} 則</small>
                   </div>
                   <b className={`momentumValue ${item.changeState}`}>
-                    {item.changeState === 'new'
-                      ? '新增'
-                      : `${Number(item.changePercent) > 0 ? '+' : ''}${Number(item.changePercent || 0).toFixed(1)}%`}
+                    {momentumLabel(item)}
                   </b>
                 </div>
               ))}
@@ -474,6 +482,43 @@ export default function Dashboard() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        )}
+        {visibleSections.electionEngagement && (
+          <div className="panel analyticsPanel electionMetricPanel">
+            <div className="sectionHeading">
+              <div className="panelTitle">
+                <span className="panelAccent purple" />
+                <h3>互動熱度比較</h3>
+              </div>
+              <span>讚 + 留言×2 + 分享×3</span>
+            </div>
+            <ResponsiveContainer width="100%" height={190}>
+              <BarChart data={stats.electionEngagement || []} margin={{ top: 16, right: 12, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#d8e5e1" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip
+                  formatter={(value, name, item) => [
+                    `${numberFormat.format(Number(value) || 0)} 分（${numberFormat.format(item.payload.likes)} 讚、${numberFormat.format(item.payload.comments)} 留言、${numberFormat.format(item.payload.shares)} 分享）`,
+                    name
+                  ]}
+                />
+                <Bar dataKey="score" name="互動熱度" radius={[5, 5, 0, 0]} maxBarSize={62}>
+                  {(stats.electionEngagement || []).map((item) => (
+                    <Cell key={item.name} fill={candidateColors[item.name] || '#64748b'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="engagementBreakdown">
+              {(stats.electionEngagement || []).map((item) => (
+                <div key={item.name}>
+                  <strong>{item.name}</strong>
+                  <span>{numberFormat.format(item.likes)} 讚 · {numberFormat.format(item.comments)} 留言 · {numberFormat.format(item.shares)} 分享</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>
