@@ -53,6 +53,12 @@ export function json(statusCode, body) {
   };
 }
 
+export function isTrustedInternalInvocation(event) {
+  // Public HTTP requests always include httpMethod. Scheduled functions and
+  // same-process background calls do not, so no caller-controlled header is trusted.
+  return event?.httpMethod === undefined;
+}
+
 export function parseBody(event) {
   if (!event.body) return {};
   try {

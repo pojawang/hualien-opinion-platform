@@ -8,7 +8,7 @@ const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mil
 
 function scheduledEvent(scheduledBody = undefined) {
   return {
-    headers: { 'x-netlify-scheduled': 'true' },
+    headers: {},
     ...(scheduledBody ? { scheduledBody } : {})
   };
 }

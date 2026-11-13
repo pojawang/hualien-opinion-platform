@@ -3,6 +3,7 @@ import {
   fetchMeta,
   fetchWithTimeout,
   isAdminRequest,
+  isTrustedInternalInvocation,
   json,
   normalizeArticle,
   parseBody,
@@ -489,7 +490,7 @@ async function insertArticles(supabase, candidates) {
 
 export async function handler(event) {
   try {
-    const isScheduled = event.httpMethod === undefined || event.headers?.['x-netlify-scheduled'] === 'true';
+    const isScheduled = isTrustedInternalInvocation(event);
     if (!isScheduled) {
       if (!(await isAdminRequest(event))) return json(403, { error: '僅管理員可執行搜尋蒐集' });
     }

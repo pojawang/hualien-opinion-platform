@@ -1,9 +1,9 @@
 import { syncFacebookApifyRuns } from './_facebookApify.js';
-import { isAdminRequest, json } from './_utils.js';
+import { isAdminRequest, isTrustedInternalInvocation, json } from './_utils.js';
 
 export async function handler(event) {
   try {
-    const isScheduled = event.httpMethod === undefined || event.headers?.['x-netlify-scheduled'] === 'true';
+    const isScheduled = isTrustedInternalInvocation(event);
     if (!isScheduled && !(await isAdminRequest(event))) {
       return json(403, { error: '僅管理員可同步 Facebook 巡查結果' });
     }

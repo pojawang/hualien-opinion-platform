@@ -1,9 +1,9 @@
 import { collectPttPosts } from '../../src/lib/collectors/ptt.ts';
-import { isAdminRequest, json, supabaseAdmin } from './_utils.js';
+import { isAdminRequest, isTrustedInternalInvocation, json, supabaseAdmin } from './_utils.js';
 
 export async function handler(event: any) {
   try {
-    const isScheduled = event.httpMethod === undefined || event.headers?.['x-netlify-scheduled'] === 'true';
+    const isScheduled = isTrustedInternalInvocation(event);
     if (!isScheduled) {
       if (!(await isAdminRequest(event))) return json(403, { error: '僅管理員可執行 PTT 蒐集' });
     }
